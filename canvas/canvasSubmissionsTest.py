@@ -1,5 +1,6 @@
 #!/usr/local/bin/python3
 
+
 # Move all files in current directory to subdirectories based on student name or student number
 
 import sys
