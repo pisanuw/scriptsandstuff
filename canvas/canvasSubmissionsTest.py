@@ -53,8 +53,8 @@ def printStudentList():
 # canvas files are lastnamefirstname_studentnumber_someothernumber_actualsubmittedfile-version.extension
 def bfile2ok(filename):
     ln = len(filename.split('_'))
-    # file can have 5 parts when late
-    return (ln == 4) or (ln == 5)
+    # file can have 5 parts when late, 6 or more if _ part of file name
+    return (ln >= 4)
 
 def bfile2lateToNormal(filename):
     patlate = "^(.*)_late_(.*)$"
@@ -67,23 +67,23 @@ def bfile2lateToNormal(filename):
 # canvas files are lastnamefirstname_studentnumber_someothernumber_actualsubmittedfile-version.extension
 def bfile2submitted(filename):
     filename = bfile2lateToNormal(filename)
-    (lastfirst, num, mysterynum, submitwithversion) = filename.split('_')
-    pat = "^(.+)-([0-9])+(.*)$"
-    prog = re.compile(pat)
-    result = prog.match(submitwithversion)
-    if (result):
-        return result.group(1) + result.group(3)
-    else:
-        return submitwithversion
+    parts = filename.split('_')
+    assert(len(parts) >= 4)
+    (lastfirst, num, mysterynum, actualsubmitted) = parts[:4]    
+    return actualsubmitted
         
 def bfile2studentnumber(filename):
-    filename = bfile2lateToNormal(filename)    
-    (lastfirst, num, mysterynum, actualsubmitted) = filename.split('_')
+    filename = bfile2lateToNormal(filename)
+    parts = filename.split('_')
+    assert(len(parts) >= 4)
+    (lastfirst, num, mysterynum, actualsubmitted) = parts[:4]    
     return num
 
 def bfile2studentdir(filename):
     filename = bfile2lateToNormal(filename)
-    (lastfirst, num, mysterynum, actualsubmitted) = filename.split('_')
+    parts = filename.split('_')
+    assert(len(parts) >= 4)
+    (lastfirst, num, mysterynum, actualsubmitted) = parts[:4]
     return lastfirst + "_" + num
 
 def getStudentNetID(number):
@@ -159,28 +159,31 @@ def runtests(tdir, submitdir):
     
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("submission_directory", help="directory for submissions, use . for current dir")
+    parser.add_argument("--dir", help="submission directory, default . for current dir")
     parser.add_argument("--classlist", help="csvfile for the classlist including student numbers")
     parser.add_argument("--testdir", help="directory for test scripts to be executed, test scripts must be named test_xxx")
     args = parser.parse_args()
     if (args.classlist):
+        args.classlist = os.path.abspath(os.path.expanduser(args.classlist))
         if (os.path.isfile(args.classlist)):
             readStudentListCanvasCSV(args.classlist)
             # printStudentList()
         else:
             print("*** classlist %s is not a valid file" % args.classlist)
             sys.exit(-1)
-    if not os.path.isdir(args.submission_directory):
-        print("*** csubmission_directory %s is not a valid directory" % args.submission_directory)
+    if not (args.dir):
+        args.dir = "."
+    args.dir = os.path.abspath(os.path.expanduser(args.dir))        
+    if not os.path.isdir(args.dir):
+        print("*** submission_directory %s is not a valid directory" % args.dir)
         sys.exit(-1)
-    args.submission_directory = os.path.abspath(args.submission_directory)
     print("Current time: %s"  % datetime.datetime.now())
-    print("Changing directory to ", args.submission_directory)
-    moveFiles(args.submission_directory)
+    print("Changing directory to ", args.dir)
+    moveFiles(args.dir)
     if (args.testdir):
-        args.testdir = os.path.abspath(args.testdir)
+        args.testdir = os.path.abspath(os.path.expanduser(args.testdir))        
         if (os.path.isdir(args.testdir)):
-            runtests(args.testdir, args.submission_directory)
+            runtests(args.testdir, args.dir)
         else:
             print("*** Test directory %s is not valid" % args.testdir)
 
