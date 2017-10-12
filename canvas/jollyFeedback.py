@@ -69,7 +69,12 @@ def bfile2submitted(filename):
     filename = bfile2lateToNormal(filename)
     parts = filename.split('_')
     assert(len(parts) >= 4)
-    (lastfirst, num, mysterynum, actualsubmitted) = parts[:4]    
+    (lastfirst, num, mysterynum, actualsubmitted) = parts[:4]
+    patversion = "^(.*)-[0-9]+.(.*)$"
+    prog = re.compile(patversion)
+    result = prog.match(actualsubmitted)
+    if (result):
+        actualsubmitted = result.group(1) + "." + result.group(2)
     return actualsubmitted
         
 def bfile2studentnumber(filename):
@@ -122,12 +127,12 @@ def moveFiles(submit):
         count = count + 1
     
 
-def runtests(tdir, submitdir):
+def runtests(helpdir, testdir, submitdir):
     testerlog = "tester_logfile.txt"
-    print("Test directory is %s" % tdir)
-    tfiles = os.listdir(tdir)
-    tfiles = [f for f in tfiles if os.path.isfile(os.path.join(tdir, f)) and f.startswith("test_") ]
-    print("Found",len(tfiles), "files: ", tfiles)
+    print("Test directory is %s" % testdir)
+    testfiles = os.listdir(testdir)
+    testfiles = [f for f in testfiles if os.path.isfile(os.path.join(testdir, f)) and f.startswith("test_") ]
+    print("Found",len(testfiles), "files: ", testfiles)
     sdirs = os.listdir(submitdir)
     sdirs = [f for f in sdirs if os.path.isdir(os.path.join(submitdir, f))]
     print("Found",len(sdirs), " student directories: ", sdirs)
@@ -142,13 +147,13 @@ def runtests(tdir, submitdir):
         # start recording tests
         with open(logfile, "a") as outfile:
             outfile.write("Starting tests at: %s\n\n"  % datetime.datetime.now())
-        for tt in tfiles:
+        for tesfile in testfiles:
             # each test opens the file to append
             with open(logfile, "a") as outfile:
-                print("---> Calling %s" % tt, end='.')
-                ttfull = os.path.join(tdir, tt)
+                print("---> Calling %s" % tesfile, end='.')
+                testfilefull = os.path.join(testdir, tesfile)
                 outfile.flush()
-                result = subprocess.call([ttfull, "   "], stdout=outfile, stderr=outfile)
+                result = subprocess.call([testfilefull, helpdir], stdout=outfile, stderr=outfile)
                 if (result):
                     print(" [Failed]")
                 else:
@@ -159,11 +164,20 @@ def runtests(tdir, submitdir):
     
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dir", help="submission directory, default . for current dir")
-    parser.add_argument("--classlist", help="csvfile for the classlist including student numbers")
-    parser.add_argument("--testdir", help="directory for test scripts to be executed, test scripts must be named test_xxx")
+    parser.add_argument("--dir", help="submission directory where downloaded canvas files are located, default . for current dir")
+    parser.add_argument("--testdir", help="tester scripts directory, test scripts must be named test_xxx (no default, must be provided)")
+    parser.add_argument("--classlist", help="csvfile for the classlist with student ids")
+    parser.add_argument("--helpdir", help="helper scripts directory, defaults to the directory where this file is")
     args = parser.parse_args()
-    if (args.classlist):
+
+    if not args.dir:
+        args.dir = "."
+    args.dir = os.path.abspath(os.path.expanduser(args.dir))        
+    if not os.path.isdir(args.dir):
+        print("*** submission_directory %s is not a valid directory" % args.dir)
+        sys.exit(-1)
+
+    if args.classlist:
         args.classlist = os.path.abspath(os.path.expanduser(args.classlist))
         if (os.path.isfile(args.classlist)):
             readStudentListCanvasCSV(args.classlist)
@@ -171,22 +185,27 @@ def main():
         else:
             print("*** classlist %s is not a valid file" % args.classlist)
             sys.exit(-1)
-    if not (args.dir):
-        args.dir = "."
-    args.dir = os.path.abspath(os.path.expanduser(args.dir))        
-    if not os.path.isdir(args.dir):
-        print("*** submission_directory %s is not a valid directory" % args.dir)
+
+    if not args.testdir:
+        print("*** testdir should be a directory for test scripts, you must provide a value")
         sys.exit(-1)
+    args.testdir = os.path.abspath(os.path.expanduser(args.testdir))        
+    if not os.path.isdir(args.testdir):
+        print("*** testdir should be a director for test scripts, %s is not a valid directory" % args.testdir)
+        sys.exit(-1)
+
+    if not args.helpdir:
+        args.helpdir = os.path.dirname(os.path.realpath(__file__))
+    print(args.helpdir)
+    args.helpdir = os.path.abspath(os.path.expanduser(args.helpdir))
+    if not os.path.isdir(args.helpdir):
+        print("*** helpdir should be a directory for helper scripts, %s is not a valid directory" % args.helpdir)
+        sys.exit(-1)        
+        
     print("Current time: %s"  % datetime.datetime.now())
     print("Changing directory to ", args.dir)
     moveFiles(args.dir)
-    if (args.testdir):
-        args.testdir = os.path.abspath(os.path.expanduser(args.testdir))        
-        if (os.path.isdir(args.testdir)):
-            runtests(args.testdir, args.dir)
-        else:
-            print("*** Test directory %s is not valid" % args.testdir)
-
+    runtests(args.helpdir, args.testdir, args.dir)
 
 main()
 
