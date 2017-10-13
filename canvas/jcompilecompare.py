@@ -1,5 +1,6 @@
 #!/usr/local/bin/python3
 
+import tempfile
 import subprocess
 import os
 import sys
@@ -10,6 +11,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--compileonly", help="only compile, no run", action='store_true')
+parser.add_argument("--template", help="template file to compare to", required=True)
 args = parser.parse_args()
 
 def jtestCompileRun(f):
@@ -36,9 +38,29 @@ def jtestCompileRun(f):
             print("XXX Running error", flush=True)        
         else:
             print("    ran successfully\n", flush=True)       
+            ftmp = tempfile.NamedTemporaryFile(delete=False)
+            # print("Created a temporary file called: %s" % f.name)
+            # f.write(b"Hello World")
+            ftmp.close()
+            with open(ftmp.name, "w") as outfile:
+                result = subprocess.call(["java", "-ea", f], stdout=outfile, stderr=outfile)
+            print("\n========================================\n", flush=True)
+            print("Comparing output produced to template file")
+            print("\n========================================\n", flush=True)
+            result = subprocess.run(["diff", "-C1", "--suppress-common-lines", ftmp.name, args.template])                
+            print("\nEnd of comparison. If the above part is empty,")
+            print("your output is identical to the template. Congratulations!")
+            print("\n========================================\n", flush=True)
+            os.unlink(ftmp.name)
 
 
-filesToCompile = sys.argv[1:]
+filesToCompile = sys.argv[3:]
+
+args.template = os.path.abspath(os.path.expanduser(args.template))
+
+if not os.path.isfile(args.template):
+    print("jcompilecompare.py could not find template file %s" % args.template)
+    exit(-1)
 
 if (len(filesToCompile) == 0):
     files = os.listdir('.')

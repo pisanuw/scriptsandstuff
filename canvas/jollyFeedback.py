@@ -145,8 +145,9 @@ def runtests(helpdir, testdir, submitdir):
             os.remove(logfile)
         print("Looking at %s" % d)
         # start recording tests
-        with open(logfile, "a") as outfile:
-            outfile.write("Starting tests at: %s\n\n"  % time.strftime("%Y-%m-%d %H:%M:%S"))
+        # with open(logfile, "a") as outfile:
+        #    outfile.write("Starting tests at: %s\n\n"  % time.strftime("%Y-%m-%d %H:%M:%S"))
+        testStartTime = format("Started tests at: %s\n"  % time.strftime("%Y-%m-%d %H:%M:%S"))            
         for tesfile in testfiles:
             # each test opens the file to append
             with open(logfile, "a") as outfile:
@@ -160,7 +161,8 @@ def runtests(helpdir, testdir, submitdir):
                     print(" [Success]")
         # Finished all tests, record time
         with open(logfile, "a") as outfile:
-            outfile.write("\n\nFinished tests at: %s\n\n\n"  % time.strftime("%Y-%m-%d %H:%M:%S"))
+            outfile.write(testStartTime)
+            outfile.write("Finished tests at: %s\n\n\n"  % time.strftime("%Y-%m-%d %H:%M:%S"))
     
 def main():
     parser = argparse.ArgumentParser()
