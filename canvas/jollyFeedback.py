@@ -7,7 +7,7 @@ import sys
 import csv
 import os
 import subprocess
-import datetime
+import time
 import argparse
 import re
 
@@ -146,7 +146,7 @@ def runtests(helpdir, testdir, submitdir):
         print("Looking at %s" % d)
         # start recording tests
         with open(logfile, "a") as outfile:
-            outfile.write("Starting tests at: %s\n\n"  % datetime.datetime.now())
+            outfile.write("Starting tests at: %s\n\n"  % time.strftime("%Y-%m-%d %H:%M:%S"))
         for tesfile in testfiles:
             # each test opens the file to append
             with open(logfile, "a") as outfile:
@@ -160,7 +160,7 @@ def runtests(helpdir, testdir, submitdir):
                     print(" [Success]")
         # Finished all tests, record time
         with open(logfile, "a") as outfile:
-            outfile.write("\n\nFinished tests at: %s\n\n\n"  % datetime.datetime.now())
+            outfile.write("\n\nFinished tests at: %s\n\n\n"  % time.strftime("%Y-%m-%d %H:%M:%S"))
     
 def main():
     parser = argparse.ArgumentParser()
@@ -202,7 +202,7 @@ def main():
         print("*** helpdir should be a directory for helper scripts, %s is not a valid directory" % args.helpdir)
         sys.exit(-1)        
         
-    print("Current time: %s"  % datetime.datetime.now())
+    print("Current time: %s"  % time.strftime("%Y-%m-%d %H:%M:%S"))
     print("Changing directory to ", args.dir)
     moveFiles(args.dir)
     runtests(args.helpdir, args.testdir, args.dir)
