@@ -14,4 +14,4 @@ if __name__ == "__main__":
     if len(sys.argv) != 3:
         sys.exit(format("usage: %s file1 file2 -- needs 2 parameters, got: %s" %
                         (os.path.basename(__file__), " ".join(sys.argv))))
-    jollyhelper.compareFiles(sys.argv[1], sys.argv[2])
+    jollyhelper.compareToTemplate(sys.argv[1], sys.argv[2])

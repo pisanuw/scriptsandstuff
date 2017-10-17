@@ -11,6 +11,8 @@ import time
 import argparse
 import re
 
+TIMEOUT = 20
+
 class Student():
     def __init__(self, lastfirst='', number='', netid=''):
         self.lastfirst = lastfirst
@@ -154,9 +156,16 @@ def runtests(helpdir, testdir, submitdir):
                 print("---> Calling %s" % tesfile, end='.')
                 testfilefull = os.path.join(testdir, tesfile)
                 outfile.flush()
-                result = subprocess.call([testfilefull, helpdir], stdout=outfile, stderr=outfile)
-                if (result):
-                    print(" [Failed]")
+                result = None
+                try:
+                    result = subprocess.run([testfilefull, helpdir], stdout=outfile, stderr=outfile, timeout=TIMEOUT)
+                except subprocess.TimeoutExpired as err:
+                    print("ALERT: Ran out of time when running %s " % testfilefull)
+                    print("ALERT: Possible cause waiting for keyboard input")
+                    print("ALERT: Possible cause infinite loop")
+                    print("TimeoutExpired error: {0}".format(err))
+                if result is None:
+                    print(" [Failed] %s" % result)
                 else:
                     print(" [Success]")
         # Finished all tests, record time
@@ -182,6 +191,7 @@ def main():
     if args.classlist:
         args.classlist = os.path.abspath(os.path.expanduser(args.classlist))
         if (os.path.isfile(args.classlist)):
+            print("Reading csv file %s" % args.classlist)
             readStudentListCanvasCSV(args.classlist)
             # printStudentList()
         else:

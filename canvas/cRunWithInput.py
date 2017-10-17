@@ -11,7 +11,7 @@ import jollyhelper
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        sys.exit(format("usage: %s file1 file2 -- needs 2 parameters, got: %s" %
+    if len(sys.argv) < 2:
+        sys.exit(format("usage: %s templatefile [file1 file2 ...]  -- needs at least 1 parameters, got: %s" %
                         (os.path.basename(__file__), " ".join(sys.argv))))
-    jollyhelper.compareFiles(sys.argv[1], sys.argv[2])
+    jollyhelper.cRunWithInput(sys.argv[1], sys.argv[2:])

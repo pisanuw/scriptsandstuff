@@ -5,11 +5,10 @@ This is useful, so we can use the subprocess mechanism and easily
 timeout or kill the script
 """
 
-
-import re
 import os
+import sys
 import jollyhelper
 
 
 if __name__ == "__main__":
-    jollyhelper.listFiles()
+    jollyhelper.javaCleanClassFiles()
