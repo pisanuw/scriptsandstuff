@@ -91,7 +91,9 @@ def bfile2studentdir(filename):
     parts = filename.split('_')
     assert(len(parts) >= 4)
     (lastfirst, num, mysterynum, actualsubmitted) = parts[:4]
-    return lastfirst + "_" + num
+    # lets use just lastfirst, no student number
+    # return lastfirst + "_" + num
+    return lastfirst
 
 def getStudentNetID(number):
     print("Looking for %s" % number)
@@ -176,9 +178,9 @@ def runtests(helpdir, testdir, submitdir):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir", help="submission directory where downloaded canvas files are located, default . for current dir")
-    parser.add_argument("--testdir", help="tester scripts directory, test scripts must be named test_xxx (no default, must be provided)")
+    parser.add_argument("--testdir", default=None, help="tester scripts directory, test scripts must be named test_xxx (no default, must be provided)")
     parser.add_argument("--classlist", help="csvfile for the classlist with student ids")
-    parser.add_argument("--helpdir", help="helper scripts directory, defaults to the directory where this file is")
+    parser.add_argument("--helpdir", default=None, help="helper scripts directory, defaults to the directory where this file is")
     args = parser.parse_args()
 
     if not args.dir:
@@ -198,17 +200,16 @@ def main():
             print("*** classlist %s is not a valid file" % args.classlist)
             sys.exit(-1)
 
-    if not args.testdir:
-        print("*** testdir should be a directory for test scripts, you must provide a value")
-        sys.exit(-1)
-    args.testdir = os.path.abspath(os.path.expanduser(args.testdir))        
-    if not os.path.isdir(args.testdir):
-        print("*** testdir should be a director for test scripts, %s is not a valid directory" % args.testdir)
-        sys.exit(-1)
+    if args.testdir is None:
+        print("Not testing anything, just moving files")
+    else:
+        args.testdir = os.path.abspath(os.path.expanduser(args.testdir))        
+        if not os.path.isdir(args.testdir):
+            print("*** testdir should be a director for test scripts, %s is not a valid directory" % args.testdir)
+            sys.exit(-1)
 
-    if not args.helpdir:
+    if args.helpdir is None:
         args.helpdir = os.path.dirname(os.path.realpath(__file__))
-    print(args.helpdir)
     args.helpdir = os.path.abspath(os.path.expanduser(args.helpdir))
     if not os.path.isdir(args.helpdir):
         print("*** helpdir should be a directory for helper scripts, %s is not a valid directory" % args.helpdir)
@@ -217,7 +218,8 @@ def main():
     print("Current time: %s"  % time.strftime("%Y-%m-%d %H:%M:%S"))
     print("Changing directory to ", args.dir)
     moveFiles(args.dir)
-    runtests(args.helpdir, args.testdir, args.dir)
+    if not args.testdir is None:
+        runtests(args.helpdir, args.testdir, args.dir)
 
 main()
 
