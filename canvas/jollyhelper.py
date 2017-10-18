@@ -1,17 +1,18 @@
 #!/usr/bin/env python
 """Helper files for JollyFeedBack"""
 
+import sys
+assert sys.version_info >= (3,5) and "Need python 3.5 or later"
+
 import socket
 import subprocess
 import re
 import os
-import sys
-from shutil import copyfile
+import shutil
 import tempfile
 import time
 import smtplib
-from smtplib import SMTPHeloError, SMTPAuthenticationError, SMTPException
-from email.mime.text import MIMEText
+import email.mime.text
 
 TIMEOUT = 5
 MAILTIMEDELAY = 15
@@ -105,7 +106,7 @@ def renameIfPossible(src, dest):
     helperMsg = format("renaming %s to %s" % (src, dest))
     helperSeparator("* Start: " + helperMsg)
     print("ALERT: Were you supposed to submit %s?" % dest)
-    copyfile(src, dest)
+    shutil.copyfile(src, dest)
     if not os.path.isfile(dest):
         print("SCRIPT ERROR: Failed to copy %s to %s" % (src, dest))
     helperSeparator("* End: " + helperMsg)
@@ -474,7 +475,7 @@ def mailSMTPLogin(smtpConnection, authFile=None):
         if not smtpuser is None and not smtppass is None:
             try:
                 smtpConnection.login(smtpuser, smtppass)
-            except (SMTPHeloError, SMTPAuthenticationError, SMTPException) as err:
+            except (smtplib.SMTPHeloError, smtplib.SMTPAuthenticationError, smtplib.SMTPException) as err:
                 print("*** Username/Password was not accepted by SMTP server")
                 print("*** The error message was %s" %err)
                 return -1
@@ -556,7 +557,7 @@ def mailSendFile(fromEmail=None,
     # Email files saved, open and read it
     with open(filetosaveemail) as fp:
         msgbody = fp.read()
-    msg = MIMEText(msgbody)
+    msg = email.mime.text.MIMEText(msgbody)
     msg['From'] = getFullFromName(fromname, fromEmail)
     msg['To'] = toEmail
     msg['Subject'] = subject
