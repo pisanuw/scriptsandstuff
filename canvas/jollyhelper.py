@@ -43,21 +43,25 @@ HELPERINFO = """
 #                smtpserver='smtp.uw.edu',
 #                filetosaveemail="tester_emailedfile.txt", timedelay=15, reallysend=False):
 """
-def helperSeparator(msg, out=sys.stdout):
-    print("==================================================", file=out)
-    print(msg, file=out)
+
+def startHelpSeparator(msg, out=sys.stdout):
+    print("* Start :" + msg, file=out)
+    print("==================================================", file=out, flush=True)
+
+def endHelpSeparator(msg, out=sys.stdout):
+    print("\n" + "* End: " + msg, file=out)
     print("==================================================", file=out, flush=True)
 
 def listFiles():
     """List the files, except for tester_ files created by Jolly"""
     helperMsg = format("listing files in directory")
-    helperSeparator("* Start: " + helperMsg)
+    startHelpSeparator(helperMsg)
     files = os.listdir('.')
     pat = "^tester_.*$"
     prog = re.compile(pat)
     files = [f for f in files if os.path.isfile(f) and f[0] != '.' and (not prog.match(f))]
     print(files)
-    helperSeparator("* End: " + helperMsg)
+    endHelpSeparator(helperMsg)
 
 def dirList(pat):
     files = os.listdir('.')
@@ -77,7 +81,7 @@ def compareFiles(file1, file2, label1=None, label2=None):
     if label2 is None:
         label2 = os.path.basename(file2)
     helperMsg = format("comparing %s to %s" % (label1, label2))
-    helperSeparator("* Start: " + helperMsg)
+    startHelpSeparator(helperMsg)
     stillOK = True
     print("Comparison is to make it easier to pinpoint differences.")
     print("These are not necessarily errors, just places to pay attention to.")
@@ -93,7 +97,7 @@ def compareFiles(file1, file2, label1=None, label2=None):
                                  "--suppress-common-lines", file1, file2])
         if result.returncode > 1:
             print("SCRIPT ERROR: diff returned %d" % result)
-    helperSeparator("* End: " + helperMsg)
+    endHelpSeparator(helperMsg)
 
 def compareToTemplate(studentfile, templateFile):
     """template file is located in __file__ directory """
@@ -103,12 +107,12 @@ def renameIfPossible(src, dest):
     if not os.path.isfile(src) or os.path.isfile(dest):
         return
     helperMsg = format("renaming %s to %s" % (src, dest))
-    helperSeparator("* Start: " + helperMsg)
+    startHelpSeparator(helperMsg)
     print("ALERT: Were you supposed to submit %s?" % dest)
     copyfile(src, dest)
     if not os.path.isfile(dest):
         print("SCRIPT ERROR: Failed to copy %s to %s" % (src, dest))
-    helperSeparator("* End: " + helperMsg)
+    endHelpSeparator(helperMsg)
 
 def genericFileComponents(file, srcExt, exeExt):
     srcmatch = re.compile("^(.*)" + srcExt + "$").match(file)
@@ -136,7 +140,7 @@ def cFile2Components(file):
 
 def genericCompile(compiler, cFlags, srcFile, exeFile):
     helperMsg = format("compiling %s" % srcFile)
-    helperSeparator("* Start: " + helperMsg)
+    startHelpSeparator(helperMsg)
     if os.path.isfile(srcFile):
         if os.path.isfile(exeFile):
             os.remove(exeFile)
@@ -149,7 +153,7 @@ def genericCompile(compiler, cFlags, srcFile, exeFile):
             print("Compiled %s and got %s" %(srcFile, exeFile))
     else:
         print("ALERT: Could not find %s to compile" % srcFile)
-    helperSeparator("* End: " + helperMsg)
+    endHelpSeparator(helperMsg)
 
 def javaCompile(givenfile=None):
     if givenfile is None or (isinstance(givenfile, list) and givenfile == []):
@@ -177,7 +181,7 @@ def genericRun(vmRunner, vmFlags, exeFile):
     if not os.path.isfile(exeFile):
         return -1
     helperMsg = format("running %s" % (exeFile))
-    helperSeparator("* Start: " + helperMsg)
+    startHelpSeparator(helperMsg)
     if not os.path.isfile(exeFile):
         print("ALERT: Could not find %s to run" % exeFile)
         return
@@ -196,7 +200,8 @@ def genericRun(vmRunner, vmFlags, exeFile):
 
     if result is None or result.returncode:
         print("ALERT: Got an error when running %s using %s" % (exeFile, command), flush=True)
-    helperSeparator("* End: " + helperMsg)
+    endHelpSeparator(helperMsg)
+    return result.returncode;
 
 def javaRun(givenfile=None):
     if givenfile is None or (isinstance(givenfile, list) and givenfile == []):
@@ -257,7 +262,7 @@ def javaRunCompareOutput(templateFile, givenfile=None):
     else:
         files = [givenfile]
     helperMsg = format("running %s and comparing output to template" % ", ".join(files))
-    helperSeparator("* Start: " + helperMsg)
+    startHelpSeparator(helperMsg)
     for file in files:
         (javaBase, javaFile, javaClass) = javaFile2Components(file)
         javaCompile(javaFile)
@@ -270,12 +275,12 @@ def javaRunCompareOutput(templateFile, givenfile=None):
                 if result != 0:
                     print("ALERT: Got an error when running %s using %s" %
                           (javaBase, command), flush=True)
-                compareFiles(ftmp.name, os.path.join(TESTERPATH, templateFile))
+            compareFiles(ftmp.name, os.path.join(TESTERPATH, templateFile))
             os.unlink(ftmp.name)
             os.unlink(javaClass)
         else:
             print("ALERT: Failed to compile %s, so cannot compare to template" % javaFile)
-    helperSeparator("* End: " + helperMsg)
+    endHelpSeparator(helperMsg)
 
 
 def cRunCompareOutput(templateFile, givenfile=None):
@@ -289,7 +294,7 @@ def cRunCompareOutput(templateFile, givenfile=None):
     else:
         files = [givenfile]
     helperMsg = format("running %s and comparing output to template" % ", ".join(files))
-    helperSeparator("* Start: " + helperMsg)
+    startHelpSeparator(helperMsg)
     for file in files:
         (cBase, cFile, cExe) = cFile2Components(file)
         cCompile(cFile)
@@ -307,7 +312,7 @@ def cRunCompareOutput(templateFile, givenfile=None):
             os.unlink(cExe)
         else:
             print("ALERT: Failed to compile %s, so cannot compare to template" % cFile)
-    helperSeparator("* End: " + helperMsg)
+    endHelpSeparator(helperMsg)
 
 def javaRunWithInput(inputfile, givenfile=None):
     if givenfile is None or (isinstance(givenfile, list) and givenfile == []):
@@ -320,7 +325,7 @@ def javaRunWithInput(inputfile, givenfile=None):
         lines = fp.readlines()
     helperMsg = format("running %s and feeding it input to examine output" %
                        ", ".join(files))
-    helperSeparator("* Start: " + helperMsg)
+    startHelpSeparator(helperMsg)
     for file in files:
         (javaBase, javaFile, javaClass) = javaFile2Components(file)
         if not os.path.isfile(javaClass):
@@ -335,7 +340,7 @@ def javaRunWithInput(inputfile, givenfile=None):
             print("ALERT: Failed to compile %s, so cannot feed it input to examine output" %
                   javaFile)
     print()
-    helperSeparator("* End: " + helperMsg)
+    endHelpSeparator(helperMsg)
 
 def cRunWithInput(inputfile, givenfile=None, outfilefp=None):
     if not os.path.isfile(inputfile):
@@ -351,7 +356,7 @@ def cRunWithInput(inputfile, givenfile=None, outfilefp=None):
         lines = fp.readlines()
     helperMsg = format("running %s and feeding it input to examine output" %
                        ", ".join(files))
-    helperSeparator("* Start: " + helperMsg)
+    startHelpSeparator(helperMsg)
     for file in files:
         (_cBase, cFile, cExe) = cFile2Components(file)
         if not os.path.isfile(cExe):
@@ -375,7 +380,7 @@ def cRunWithInput(inputfile, givenfile=None, outfilefp=None):
             print("ALERT: Failed to compile %s, so cannot feed it input to examine output" %
                   cFile)
     print()
-    helperSeparator("* End: " + helperMsg)
+    endHelpSeparator(helperMsg)
 
 def cRunWithInputOutput(inputfile, templateFile, givenfile):
     if not os.path.isfile(inputfile):
@@ -395,7 +400,7 @@ def cRunWithInputOutput(inputfile, templateFile, givenfile):
 # run a script with timeout
 ###########################################################################
 
-def runHelper(cmd, args=None,timeout=10):
+def runHelper(cmd, args=None, timeout=10):
     # if there is a local file or full path given, let it override the directory
     if os.path.isfile(cmd):
         fullcmd = cmd
@@ -496,9 +501,9 @@ def hostnameIsValid(hostname):
         return False
 
 def emailIsValid(email):
-    emailRegex = "\A[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*"
-    emailRegex = emailRegex + "@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+"
-    emailRegex = emailRegex + "[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
+    emailRegex = "\A[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*" # pylint: disable=anomalous-backslash-in-string
+    emailRegex = emailRegex + "@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+" # pylint: disable=anomalous-backslash-in-string
+    emailRegex = emailRegex + "[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" # pylint: disable=anomalous-backslash-in-string
     return not email is None and re.compile(emailRegex).match(email)
 
 def getFullFromName(fromname, fromEmail):
@@ -506,6 +511,7 @@ def getFullFromName(fromname, fromEmail):
         return format("<%s>" % (fromEmail))
     return format("%s <%s>" % (fromname, fromEmail))
 
+# pylint: disable=too-many-arguments, too-many-locals
 def mailSendFile(fromEmail=None,
                  toEmail=None,
                  subject='Comments from JollyFeedback Automated Script',
@@ -549,9 +555,8 @@ def mailSendFile(fromEmail=None,
     # Prepare saved version of email
     with open(filetosaveemail, "w") as fp:
         mailWriteIntroduction(fp, fileforintrotext)
-        helperSeparator(format("Sent from %s to %s on %s\n" %
-                               (fromEmail, toEmail, time.strftime("%Y-%m-%d %H:%M:%S"))),
-                        fp)
+        startHelpSeparator(format("Sent from %s to %s on %s\n" %
+                                  (fromEmail, toEmail, time.strftime("%Y-%m-%d %H:%M:%S"))), fp)
         fp.write(testerLines)
     # Email files saved, open and read it
     with open(filetosaveemail) as fp:
@@ -565,17 +570,17 @@ def mailSendFile(fromEmail=None,
     # CHECK if you REALLY want to send it
     if reallysend:
         helpermsg = format("Sending mail to %s" % toEmail)
-        helperSeparator("* Start: " + helpermsg)
+        startHelpSeparator(helpermsg)
         print("* Copy of this email is in %s\n===" % filetosaveemail)
         mailSendViaSMTP(fromEmail, recipients, msg, authfile=authfile, smtpserver=smtpserver)
         time.sleep(timedelay)
-        helperSeparator("* End: " + helpermsg)
+        endHelpSeparator(helpermsg)
     else:
         helpermsg = "--reallysend is FALSE so not actually sending mail"
-        helperSeparator("* Start: " + helpermsg)
+        startHelpSeparator(helpermsg)
         print("* Copy of this email is in %s\n===" % filetosaveemail)
-        print(msgbody)
-        helperSeparator("* End: " + helpermsg)
+        # print(msgbody)
+        endHelpSeparator(helpermsg)
 
 if __name__ == "__main__":
     print(HELPERINFO)

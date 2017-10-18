@@ -160,7 +160,8 @@ def runtests(helpdir, testdir, submitdir):
                 outfile.flush()
                 result = None
                 try:
-                    result = subprocess.run([testfilefull, helpdir], stdout=outfile, stderr=outfile, timeout=TIMEOUT)
+                    # Default helpdir is fine
+                    result = subprocess.run([testfilefull, "--helpdir", helpdir], stdout=outfile, stderr=outfile, timeout=TIMEOUT)
                 except subprocess.TimeoutExpired as err:
                     print("ALERT: Ran out of time when running %s " % testfilefull)
                     print("ALERT: Possible cause waiting for keyboard input")
