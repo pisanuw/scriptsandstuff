@@ -1,0 +1,7 @@
+
+proper names for students
+
+pylint on jolly helper
+move runhelper to jollyhelper
+
+styel language 
