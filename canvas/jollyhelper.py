@@ -249,7 +249,7 @@ def cCleanExeFiles():
 def javaRunCompareOutput(templateFile, givenfile=None):
     if not os.path.isfile(templateFile):
         print("SCRIPT ERROR: Could not find template file: %s" % templateFile)
-        return    
+        return
     if givenfile is None or (isinstance(givenfile, list) and givenfile == []):
         files = dirListJava()
     elif isinstance(givenfile, list):
@@ -334,7 +334,7 @@ def javaRunWithInput(inputfile, givenfile=None):
         else:
             print("ALERT: Failed to compile %s, so cannot feed it input to examine output" %
                   javaFile)
-    print();            
+    print()
     helperSeparator("* End: " + helperMsg)
 
 def cRunWithInput(inputfile, givenfile=None, outfilefp=None):
@@ -374,7 +374,7 @@ def cRunWithInput(inputfile, givenfile=None, outfilefp=None):
         else:
             print("ALERT: Failed to compile %s, so cannot feed it input to examine output" %
                   cFile)
-    print();
+    print()
     helperSeparator("* End: " + helperMsg)
 
 def cRunWithInputOutput(inputfile, templateFile, givenfile):
@@ -390,7 +390,43 @@ def cRunWithInputOutput(inputfile, templateFile, givenfile):
     if os.path.isfile(outfilefp.name):
         compareFiles(outfilefp.name, os.path.join(TESTERPATH, templateFile), "output")
         os.unlink(outfilefp.name)
-        
+
+###########################################################################
+# run a script with timeout
+###########################################################################
+
+def runHelper(cmd, args=None,timeout=10):
+    # if there is a local file or full path given, let it override the directory
+    if os.path.isfile(cmd):
+        fullcmd = cmd
+    else:
+        fullcmd = os.path.join(TESTERPATH, cmd)
+    if not os.path.isfile(fullcmd):
+        print("*** Could not find %s to execute, skipping test" % fullcmd)
+        return
+    if not os.access(fullcmd, os.X_OK):
+        print("*** Cannot execute %s, check file permissions" % fullcmd)
+        return
+    # print("Running %s" % fullcmd, flush=True)
+    if args is None:
+        args = []
+    runcmd = [fullcmd] + args
+    # print(runcmd)
+    run = None
+    try:
+        run = subprocess.run(runcmd, timeout=timeout)
+    except subprocess.TimeoutExpired as err:
+        print("ALERT: Ran out of time when running %s " % fullcmd)
+        print("ALERT: Possible cause waiting for keyboard input")
+        print("ALERT: Possible cause infinite loop")
+        print("TimeoutExpired error: {0}".format(err))
+    if run is None:
+        print("ALERT: Did not get to run the command %s " % fullcmd)
+    elif run.returncode != 0:
+        print("ALERT: Subprocess returned %d for command %s " % (run.returncode, fullcmd))
+    # Assume all is well
+
+
 ###########################################################################
 # Mail Section
 ###########################################################################
@@ -460,14 +496,15 @@ def hostnameIsValid(hostname):
         return False
 
 def emailIsValid(email):
-    emailRegex = "\A[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
+    emailRegex = "\A[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*"
+    emailRegex = emailRegex + "@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+"
+    emailRegex = emailRegex + "[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
     return not email is None and re.compile(emailRegex).match(email)
 
 def getFullFromName(fromname, fromEmail):
     if fromname is None:
         return format("<%s>" % (fromEmail))
     return format("%s <%s>" % (fromname, fromEmail))
-        
 
 def mailSendFile(fromEmail=None,
                  toEmail=None,
