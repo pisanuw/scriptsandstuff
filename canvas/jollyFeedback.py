@@ -1,9 +1,13 @@
 #!/usr/local/bin/python3
-
-
-# Move all files in current directory to subdirectories based on student name or student number
+"""jollyFeedback is the driver for moving files downloaded from canvas into their own directories
+and then running all the test programs"""
 
 import sys
+if not sys.version_info >= (3, 5):
+    print("%s needs python 3.5 or later" % __file__)
+    sys.exit(-1)
+
+# pylint: disable=wrong-import-position
 import csv
 import os
 import subprocess
@@ -14,6 +18,7 @@ import re
 TIMEOUT = 20
 
 class Student():
+    # pylint: disable=too-few-public-methods
     def __init__(self, lastfirst='', number='', netid=''):
         self.lastfirst = lastfirst
         self.number = number
@@ -25,7 +30,7 @@ class Student():
 
 
 
-studentInfo = [ ]
+STUDENTINFO = []
 
 # The UW student list is in the form of
 # Student Number	UW NetID	Name	Last Name	Credits	Class	Majors	Email
@@ -33,7 +38,7 @@ studentInfo = [ ]
 #     with open(classList) as csvfile:
 #         classReader = csv.reader(csvfile, delimiter=',')
 #         for row in classReader:
-#             studentInfo[row[0]] = Student(row[0],row[1],row[2],row[3],row[7])
+#             STUDENTINFO[row[0]] = Student(row[0],row[1],row[2],row[3],row[7])
 
 
 # Canvas download grades gives you a csv file of the form
@@ -46,75 +51,77 @@ def readStudentListCanvasCSV(classList):
         next(classReader)
         next(classReader)
         for row in classReader:
-            studentInfo.append(Student(row[0],row[1],row[3]))
+            STUDENTINFO.append(Student(row[0], row[1], row[3]))
 
 def printStudentList():
-    for s in studentInfo:
-        print(s)
+    for student in STUDENTINFO:
+        print(student)
 
-# canvas files are lastnamefirstname_studentnumber_someothernumber_actualsubmittedfile-version.extension
+# canvas files are
+# lastnamefirstname_studentnumber_someothernumber_actualsubmittedfile-version.extension
 def bfile2ok(filename):
     ln = len(filename.split('_'))
     # file can have 5 parts when late, 6 or more if _ part of file name
-    return (ln >= 4)
+    return ln >= 4
 
 def bfile2lateToNormal(filename):
     patlate = "^(.*)_late_(.*)$"
     prog = re.compile(patlate)
     result = prog.match(filename)
-    if (result):
+    if result:
         filename = result.group(1) + "_" + result.group(2)
     return filename
 
-# canvas files are lastnamefirstname_studentnumber_someothernumber_actualsubmittedfile-version.extension
+# canvas files are
+# lastnamefirstname_studentnumber_someothernumber_actualsubmittedfile-version.extension
 def bfile2submitted(filename):
     filename = bfile2lateToNormal(filename)
     parts = filename.split('_')
-    assert(len(parts) >= 4)
-    (lastfirst, num, mysterynum, actualsubmitted) = parts[:4]
+    assert len(parts) >= 4
+    (_lastfirst, _num, _mysterynum, actualsubmitted) = parts[:4]
     patversion = "^(.*)-[0-9]+.(.*)$"
     prog = re.compile(patversion)
     result = prog.match(actualsubmitted)
-    if (result):
+    if result:
         actualsubmitted = result.group(1) + "." + result.group(2)
     return actualsubmitted
-        
+
 def bfile2studentnumber(filename):
     filename = bfile2lateToNormal(filename)
     parts = filename.split('_')
-    assert(len(parts) >= 4)
-    (lastfirst, num, mysterynum, actualsubmitted) = parts[:4]    
+    assert len(parts) >= 4
+    (_lastfirst, num, _mysterynum, _actualsubmitted) = parts[:4]
     return num
 
 def bfile2studentdir(filename):
     filename = bfile2lateToNormal(filename)
     parts = filename.split('_')
-    assert(len(parts) >= 4)
-    (lastfirst, num, mysterynum, actualsubmitted) = parts[:4]
+    assert len(parts) >= 4
+    (lastfirst, _num, _mysterynum, _actualsubmitted) = parts[:4]
     # lets use just lastfirst, no student number
     # return lastfirst + "_" + num
     return lastfirst
 
 def getStudentNetID(number):
     print("Looking for %s" % number)
-    for s in studentInfo:
-        if (number == s.number):
-            return s.netid
+    for student in STUDENTINFO:
+        if number == student.number:
+            return student.netid
     return 0
 
 def moveFiles(submit):
     files = os.listdir(submit)
-    print("Found",len(files), "files and directories")    
+    print("Found", len(files), "files and directories")
     files = [f for f in files if os.path.isfile(os.path.join(submit, f)) and f[0] != '.']
-    print("Found",len(files), "files: ", files)
+    print("Found", len(files), "files: ", files)
     count = 1
     for file in files:
-        print(count," processing", file)
+        print(count, " processing", file)
         if bfile2ok(file):
             filefull = os.path.join(submit, file)
             sdirfull = os.path.join(submit, bfile2studentdir(file))
             newfilefull = os.path.join(sdirfull, bfile2submitted(file))
-            if (not os.path.exists(sdirfull)):
+            if not os.path.exists(sdirfull):
                 print("   Making ", sdirfull)
                 os.mkdir(sdirfull)
             print("   Renaming ", filefull, " to ", newfilefull)
@@ -122,36 +129,36 @@ def moveFiles(submit):
             # Add student UWNetID if possible
             snumber = bfile2studentnumber(file)
             sID = getStudentNetID(snumber)
-            if (sID):
+            if sID:
                 sidFile = os.path.join(sdirfull, format("tester_netid_%s.txt" % sID))
                 with open(sidFile, "w") as outfile:
                     outfile.write(sID)
         else:
             print("*** Skipping bad file: ", file)
         count = count + 1
-    
 
 def runtests(helpdir, testdir, submitdir):
     testerlog = "tester_logfile.txt"
     print("Test directory is %s" % testdir)
     testfiles = os.listdir(testdir)
-    testfiles = [f for f in testfiles if os.path.isfile(os.path.join(testdir, f)) and f.startswith("test_") ]
-    print("Found",len(testfiles), "files: ", testfiles)
+    testfiles = [f for f in testfiles
+                 if os.path.isfile(os.path.join(testdir, f)) and f.startswith("test_")]
+    print("Found", len(testfiles), "files: ", testfiles)
     sdirs = os.listdir(submitdir)
     sdirs = [f for f in sdirs if os.path.isdir(os.path.join(submitdir, f))]
-    print("Found",len(sdirs), " student directories: ", sdirs)
-    for d in sdirs:
-        dfull = os.path.join(submitdir, d)
+    print("Found", len(sdirs), " student directories: ", sdirs)
+    for directory in sdirs:
+        dfull = os.path.join(submitdir, directory)
         os.chdir(dfull)
         logfile = os.path.join(dfull, testerlog)
         if os.path.isfile(logfile):
             # print("Removing old logfile %s" % logfile)
             os.remove(logfile)
-        print("Looking at %s" % d)
+        print("Looking at %s" % directory)
         # start recording tests
         # with open(logfile, "a") as outfile:
         #    outfile.write("Starting tests at: %s\n\n"  % time.strftime("%Y-%m-%d %H:%M:%S"))
-        testStartTime = format("Started tests at: %s\n"  % time.strftime("%Y-%m-%d %H:%M:%S"))            
+        testStartTime = format("Started tests at: %s\n"  % time.strftime("%Y-%m-%d %H:%M:%S"))
         for tesfile in testfiles:
             # each test opens the file to append
             with open(logfile, "a") as outfile:
@@ -161,7 +168,8 @@ def runtests(helpdir, testdir, submitdir):
                 result = None
                 try:
                     # Default helpdir is fine
-                    result = subprocess.run([testfilefull, "--helpdir", helpdir], stdout=outfile, stderr=outfile, timeout=TIMEOUT)
+                    result = subprocess.run([testfilefull, "--helpdir", helpdir],
+                                            stdout=outfile, stderr=outfile, timeout=TIMEOUT)
                 except subprocess.TimeoutExpired as err:
                     print("ALERT: Ran out of time when running %s " % testfilefull)
                     print("ALERT: Possible cause waiting for keyboard input")
@@ -175,9 +183,10 @@ def runtests(helpdir, testdir, submitdir):
         with open(logfile, "a") as outfile:
             outfile.write(testStartTime)
             outfile.write("Finished tests at: %s\n\n\n"  % time.strftime("%Y-%m-%d %H:%M:%S"))
-    
+
 def main():
     parser = argparse.ArgumentParser()
+    # pylint: disable=line-too-long
     parser.add_argument("--dir", help="submission directory where downloaded canvas files are located, default . for current dir")
     parser.add_argument("--testdir", default=None, help="tester scripts directory, test scripts must be named test_xxx (no default, must be provided)")
     parser.add_argument("--classlist", help="csvfile for the classlist with student ids")
@@ -186,14 +195,14 @@ def main():
 
     if not args.dir:
         args.dir = "."
-    args.dir = os.path.abspath(os.path.expanduser(args.dir))        
+    args.dir = os.path.abspath(os.path.expanduser(args.dir))
     if not os.path.isdir(args.dir):
         print("*** submission_directory %s is not a valid directory" % args.dir)
         sys.exit(-1)
 
     if args.classlist:
         args.classlist = os.path.abspath(os.path.expanduser(args.classlist))
-        if (os.path.isfile(args.classlist)):
+        if os.path.isfile(args.classlist):
             print("Reading csv file %s" % args.classlist)
             readStudentListCanvasCSV(args.classlist)
             # printStudentList()
@@ -204,7 +213,7 @@ def main():
     if args.testdir is None:
         print("Not testing anything, just moving files")
     else:
-        args.testdir = os.path.abspath(os.path.expanduser(args.testdir))        
+        args.testdir = os.path.abspath(os.path.expanduser(args.testdir))
         if not os.path.isdir(args.testdir):
             print("*** testdir should be a director for test scripts, %s is not a valid directory" % args.testdir)
             sys.exit(-1)
@@ -214,14 +223,12 @@ def main():
     args.helpdir = os.path.abspath(os.path.expanduser(args.helpdir))
     if not os.path.isdir(args.helpdir):
         print("*** helpdir should be a directory for helper scripts, %s is not a valid directory" % args.helpdir)
-        sys.exit(-1)        
-        
+        sys.exit(-1)
     print("Current time: %s"  % time.strftime("%Y-%m-%d %H:%M:%S"))
     print("Changing directory to ", args.dir)
     moveFiles(args.dir)
     if not args.testdir is None:
         runtests(args.helpdir, args.testdir, args.dir)
 
+# let's make this happen
 main()
-
-

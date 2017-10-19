@@ -12,6 +12,7 @@ import jollyhelper
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
+        # pylint: disable=line-too-long
         sys.exit(format("usage: %s templatefile [file1 file2 ...]  -- needs at least 1 parameters, got: %s" %
                         (os.path.basename(__file__), " ".join(sys.argv))))
     jollyhelper.cRunCompareOutput(sys.argv[1], sys.argv[2:])

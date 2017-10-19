@@ -2,8 +2,11 @@
 """Helper files for JollyFeedBack"""
 
 import sys
-assert sys.version_info >= (3,5) and "Need python 3.5 or later"
+if not sys.version_info >= (3, 5):
+    print("%s needs python 3.5 or later" % __file__)
+    sys.exit(-1)
 
+# pylint: disable=wrong-import-position
 import socket
 import subprocess
 import re
@@ -202,7 +205,7 @@ def genericRun(vmRunner, vmFlags, exeFile):
     if result is None or result.returncode:
         print("ALERT: Got an error when running %s using %s" % (exeFile, command), flush=True)
     endHelpSeparator(helperMsg)
-    return result.returncode;
+    return result.returncode
 
 def javaRun(givenfile=None):
     if givenfile is None or (isinstance(givenfile, list) and givenfile == []):
@@ -440,13 +443,13 @@ def mailGetToAddressFromNETID():
     files = os.listdir('.')
     pat = "^tester_netid_(.*).txt$"
     prog = re.compile(pat)
-    email = ""
+    studentEmail = None
     for file in files:
         result = prog.match(file)
         if result:
-            email = format("%s@uw.edu" % result.group(1))
+            studentEmail = format("%s@uw.edu" % result.group(1))
     # email = 'yusuf.pisan@gmail.com'
-    return email
+    return studentEmail
 
 def mailWriteIntroduction(fp, introFile=None):
     msg = """
@@ -480,6 +483,7 @@ def mailSMTPLogin(smtpConnection, authFile=None):
         if not smtpuser is None and not smtppass is None:
             try:
                 smtpConnection.login(smtpuser, smtppass)
+            # pylint: disable=line-too-long
             except (smtplib.SMTPHeloError, smtplib.SMTPAuthenticationError, smtplib.SMTPException) as err:
                 print("*** Username/Password was not accepted by SMTP server")
                 print("*** The error message was %s" %err)
@@ -501,11 +505,11 @@ def hostnameIsValid(hostname):
     except socket.error:
         return False
 
-def emailIsValid(email):
+def emailIsValid(emailAddress):
     emailRegex = "\A[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*" # pylint: disable=anomalous-backslash-in-string
     emailRegex = emailRegex + "@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+" # pylint: disable=anomalous-backslash-in-string
     emailRegex = emailRegex + "[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" # pylint: disable=anomalous-backslash-in-string
-    return not email is None and re.compile(emailRegex).match(email)
+    return not emailAddress is None and re.compile(emailRegex).match(emailAddress)
 
 def getFullFromName(fromname, fromEmail):
     if fromname is None:
@@ -530,7 +534,7 @@ def mailSendFile(fromEmail=None,
     # check toEmail
     if toEmail is None:
         toEmail = mailGetToAddressFromNETID()
-    if not emailIsValid(toEmail):
+    if toEmail is None or not emailIsValid(toEmail):
         print("SCRIPT ERROR: The toEmail address %s is not valid" % toEmail)
         return
     # check filetosend
@@ -550,7 +554,6 @@ def mailSendFile(fromEmail=None,
         return
     # Enough checks, lets do it
     # Read filetosend
-    testerLines = ""
     with open(filetosend) as testerlog:
         testerLines = testerlog.read()
     # Prepare saved version of email
