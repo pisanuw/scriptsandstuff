@@ -14,6 +14,7 @@ import jollyhelper
 #                 filetosaveemail="tester_emailedfile.txt", timedelay=15, reallysend=False):
 
 if __name__ == "__main__":
+    # pylint: disable=line-too-long
     PARSER = argparse.ArgumentParser()
     PARSER.add_argument("--fromemail",
                         help='from address in the form of xxx@yyy.edu', required=True)
@@ -37,6 +38,14 @@ if __name__ == "__main__":
                         help="must be specified to really send email", action='store_true')
     PARSER.add_argument("--fileforintrotext",
                         help='friendly text about the script, default is in source file')
+    PARSER.add_argument("--diffdir", default=None,
+                        help="performing differential email " +
+                        "will override --reallysend to be False when the directory --diffdir contains a -difffile " +
+                        "that is identical to the current submission directory we are examinining")
+    PARSER.add_argument("--difffile", default=None,
+                        help="must be used with --diffdir " +
+                        "If this file in the current directory is the same as the one in --diffdir " +
+                        "sets --reallysend to be False. No effect if --reallysend is not specified")
     ARGS = PARSER.parse_args()
 
     jollyhelper.mailSendFile(fromEmail=ARGS.fromemail,
@@ -49,4 +58,6 @@ if __name__ == "__main__":
                              smtpserver=ARGS.smtpserver,
                              filetosaveemail=ARGS.filetosaveemail,
                              timedelay=ARGS.timedelay,
+                             diffDir=ARGS.diffdir,
+                             diffFile=ARGS.difffile,
                              reallysend=ARGS.reallysend)

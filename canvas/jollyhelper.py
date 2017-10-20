@@ -506,10 +506,12 @@ def hostnameIsValid(hostname):
         return False
 
 def emailIsValid(emailAddress):
+    if emailAddress is None:
+        return False
     emailRegex = "\A[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*" # pylint: disable=anomalous-backslash-in-string
     emailRegex = emailRegex + "@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+" # pylint: disable=anomalous-backslash-in-string
     emailRegex = emailRegex + "[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" # pylint: disable=anomalous-backslash-in-string
-    return not emailAddress is None and re.compile(emailRegex).match(emailAddress)
+    return not re.compile(emailRegex).match(emailAddress) is None
 
 def getFullFromName(fromname, fromEmail):
     if fromname is None:
@@ -526,6 +528,7 @@ def mailSendFile(fromEmail=None,
                  authfile='~/private/jollyauth.txt',
                  smtpserver='smtp.uw.edu',
                  filetosaveemail="tester_emailedfile.txt",
+                 diffDir=None, diffFile=None,
                  timedelay=MAILTIMEDELAY, reallysend=False):
     # check fromEmail
     if not emailIsValid(fromEmail):
@@ -552,6 +555,16 @@ def mailSendFile(fromEmail=None,
     if not hostnameIsValid(smtpserver):
         print("SCRIPT ERROR: The smtpserver %s could not be resolved" % smtpserver)
         return
+    # check diffDir
+    if (diffDir is None and not diffFile is None) or (not diffDir is None and diffFile is None):
+        print("SCRIPT ERROR: diffDir and diffFile must both be set " +
+              "or must both be unset, got %s and %s" % (diffDir, diffFile))
+        return
+    if not diffDir is None:
+        diffDir = os.path.abspath(os.path.expanduser(diffDir))
+        if not os.path.isdir(diffDir):
+            print("SCRIPT ERROR: The diffDir directory %s could not be found" % diffDir)
+            return
     # Enough checks, lets do it
     # Read filetosend
     with open(filetosend) as testerlog:
