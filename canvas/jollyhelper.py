@@ -7,6 +7,7 @@ if not sys.version_info >= (3, 5):
     sys.exit(-1)
 
 # pylint: disable=wrong-import-position
+import csv
 import socket
 import subprocess
 import re
@@ -16,6 +17,7 @@ import tempfile
 import time
 import smtplib
 import email.mime.text
+import zipfile
 
 TIMEOUT = 5
 MAILTIMEDELAY = 15
@@ -25,6 +27,7 @@ JAVAVM = "java"
 JAVAFLAGS = ["-ea"]
 CCOMPILER = "gcc"
 CFLAGS = ["-Wall", "-g", "-o"]
+DEFAULTDRAFTEMAIL = "tester_draftemail.txt"
 
 HELPERINFO = """
 ############################################
@@ -48,8 +51,85 @@ HELPERINFO = """
 #                filetosaveemail="tester_emailedfile.txt", timedelay=15, reallysend=False):
 """
 
+############################################
+# Collect STUDENTINFO from csv file
+############################################
+STUDENTINFO = []
+
+class Student():
+    # pylint: disable=too-few-public-methods
+    def __init__(self, lastfirst='', number='', netid=''):
+        self.lastfirst = lastfirst
+        self.number = number
+        self.netid = netid
+    def __str__(self):
+        return "<S: " + " ".join([self.lastfirst, self.number, self.netid]) + ">"
+
+# Canvas download grades gives you a csv file of the form
+# Student, ID, SIS User ID, SIS Login ID, Section
+# Student is Lastname, Firstname Middlename
+def readStudentListCanvasCSV(classList):
+    with open(classList) as csvfile:
+        classReader = csv.reader(csvfile, delimiter=',')
+        # skip 2 header lines
+        next(classReader)
+        next(classReader)
+        for row in classReader:
+            STUDENTINFO.append(Student(row[0], row[1], row[3]))
+
+def printStudentList():
+    for student in STUDENTINFO:
+        print(student)
+
+def getStudentName(number):
+    # print("Looking for %s" % number)
+    for student in STUDENTINFO:
+        if number == student.number:
+            return student.lastfirst
+    return None
+
+# lastfirst is in the form: Doe, Cris Man
+# replace , and space with _
+def substCommaAndSpace(name):
+    noSpace = name.replace(" ", "_")
+    noComma = noSpace.replace(",", "")
+    return noComma
+
+def getStudentNetID(number):
+    # print("Looking for %s" % number)
+    for student in STUDENTINFO:
+        if number == student.number:
+            return student.netid
+    return None
+
+############################################
+# Unzip files
+############################################
+def unzipSubmissions(zipFile=None):
+    if zipFile is None or not os.path.isfile(zipFile):
+        print("SCRIPT ERROR: zipfile %s is not found" % zipFile)
+        return None
+    zipDir = os.path.dirname(zipFile)
+    (targetDirName, _) = os.path.splitext(os.path.basename(zipFile))
+    targetDir = os.path.join(zipDir, targetDirName)
+    if os.path.isdir(targetDir):
+        print("ERROR: Must delete target directory %s before unzipping %s" %
+              (targetDir, zipFile))
+        return None
+    print("Unzipping %s to %s" % (zipFile, targetDir))
+    with zipfile.ZipFile(zipFile,"r") as zipRef:
+        zipRef.extractall(path=targetDir)
+    if not os.path.isdir(targetDir):
+        print("*** Unzipped %s, but could not find directory % for the files%s" % (zipFile, targetDir))
+        return None
+    return targetDir
+
+def printDraft(msg, out=DEFAULTDRAFTEMAIL):
+    with open(out, "a") as outfile:
+        print(msg, outfile)
+   
 def startHelpSeparator(msg, out=sys.stdout):
-    print("* Start :" + msg, file=out)
+    print("* Start: " + msg, file=out)
     print("==================================================", file=out, flush=True)
 
 def endHelpSeparator(msg, out=sys.stdout):
@@ -105,7 +185,7 @@ def compareFiles(file1, file2, label1=None, label2=None):
 
 def compareToTemplate(studentfile, templateFile):
     """template file is located in __file__ directory """
-    compareFiles(studentfile, os.path.join(TESTERPATH, templateFile))
+    compareFiles(studentfile, os.path.join(TESTERPATH, templateFile), "your-program-output.txt")
 
 def renameIfPossible(src, dest):
     if not os.path.isfile(src) or os.path.isfile(dest):
@@ -167,7 +247,7 @@ def javaCompile(givenfile=None):
     else:
         files = [givenfile]
     for file in files:
-        (_javaBase, javaFile, javaClass) = javaFile2Components(file)
+        (_, javaFile, javaClass) = javaFile2Components(file)
         genericCompile(JAVACOMPILER, [], javaFile, javaClass)
 
 def cCompile(givenfile=None):
@@ -178,7 +258,7 @@ def cCompile(givenfile=None):
     else:
         files = [givenfile]
     for file in files:
-        (_cBase, cFile, cExe) = cFile2Components(file)
+        (_, cFile, cExe) = cFile2Components(file)
         genericCompile(CCOMPILER, CFLAGS + [cExe], cFile, cExe)
 
 def genericRun(vmRunner, vmFlags, exeFile):
@@ -188,7 +268,7 @@ def genericRun(vmRunner, vmFlags, exeFile):
     startHelpSeparator(helperMsg)
     if not os.path.isfile(exeFile):
         print("ALERT: Could not find %s to run" % exeFile)
-        return
+        return -1
     if vmRunner is None:
         command = [exeFile]
     else:
@@ -215,7 +295,7 @@ def javaRun(givenfile=None):
     else:
         files = [givenfile]
     for file in files:
-        (javaBase, _javaFile, _javaClass) = javaFile2Components(file)
+        (javaBase, _, _) = javaFile2Components(file)
         genericRun(JAVAVM, JAVAFLAGS, javaBase)
 
 def cRun(givenfile=None):
@@ -226,7 +306,7 @@ def cRun(givenfile=None):
     else:
         files = [givenfile]
     for file in files:
-        (_cBase, _cFile, cExe) = cFile2Components(file)
+        (_, _, cExe) = cFile2Components(file)
         genericRun(None, [], "./" + cExe)
 
 def javaCompileRun(file=None):
@@ -241,7 +321,7 @@ def cCompileRun(givenfile=None):
     else:
         files = [givenfile]
     for file in files:
-        (_cBase, cFile, cExe) = cFile2Components(file)
+        (_, cFile, cExe) = cFile2Components(file)
         cCompile(cFile)
         cRun(cExe)
 
@@ -279,7 +359,7 @@ def javaRunCompareOutput(templateFile, givenfile=None):
                 if result != 0:
                     print("ALERT: Got an error when running %s using %s" %
                           (javaBase, command), flush=True)
-            compareFiles(ftmp.name, os.path.join(TESTERPATH, templateFile))
+            compareFiles(ftmp.name, os.path.join(TESTERPATH, templateFile), "your-program-output.txt")
             os.unlink(ftmp.name)
             os.unlink(javaClass)
         else:
@@ -362,7 +442,7 @@ def cRunWithInput(inputfile, givenfile=None, outfilefp=None):
                        ", ".join(files))
     startHelpSeparator(helperMsg)
     for file in files:
-        (_cBase, cFile, cExe) = cFile2Components(file)
+        (_, cFile, cExe) = cFile2Components(file)
         if not os.path.isfile(cExe):
             cCompile(cFile)
         if os.path.isfile(cExe):
@@ -397,7 +477,7 @@ def cRunWithInputOutput(inputfile, templateFile, givenfile):
     outfilefp.close()
     cRunWithInput(inputfile, givenfile, outfilefp)
     if os.path.isfile(outfilefp.name):
-        compareFiles(outfilefp.name, os.path.join(TESTERPATH, templateFile), "output")
+        compareFiles(outfilefp.name, os.path.join(TESTERPATH, templateFile), "your-program-output.txt")
         os.unlink(outfilefp.name)
 
 ###########################################################################
@@ -439,7 +519,21 @@ def runHelper(cmd, args=None, timeout=10):
 ###########################################################################
 # Mail Section
 ###########################################################################
-def mailGetToAddressFromNETID():
+def getNameFromTesterFile():
+    files = os.listdir('.')
+    pat = "^tester_name_(.+)_(.+).txt$"
+    prog = re.compile(pat)
+    for file in files:
+        result = prog.match(file)
+        if result:
+            lastName = result.group(1)
+            firstName = result.group(2)
+            # firstName can be John_Mary, so must open it up
+            firstName.replace("_", " ")
+            return (lastName, firstName)
+    return (None, None)
+
+def getNETIDFromTesterFile():
     files = os.listdir('.')
     pat = "^tester_netid_(.*).txt$"
     prog = re.compile(pat)
@@ -536,7 +630,7 @@ def mailSendFile(fromEmail=None,
         return
     # check toEmail
     if toEmail is None:
-        toEmail = mailGetToAddressFromNETID()
+        toEmail = getNETIDFromTesterFile()
     if toEmail is None or not emailIsValid(toEmail):
         print("SCRIPT ERROR: The toEmail address %s is not valid" % toEmail)
         return

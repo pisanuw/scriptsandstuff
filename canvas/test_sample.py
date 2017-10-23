@@ -9,6 +9,7 @@ import argparse
 # You should not modify this section
 # All tests go below to [TESTING AREA]
 ########################################################################################
+# pylint: disable=line-too-long
 
 PARSER = argparse.ArgumentParser()
 PARSER.add_argument("--helpdir", default="~/bitbucket/scriptsandstuff/canvas",
@@ -28,6 +29,7 @@ MYDIR = os.path.dirname(os.path.realpath(__file__))
 # The helper scripts and helper python files are in the jollyFeedback directory
 
 sys.path.insert(0, HELPDIR)
+# pylint: disable=wrong-import-position
 import jollyhelper
 
 ########################################################################################
@@ -115,7 +117,7 @@ jollyhelper.runHelper("mailSendFile.py",
                           "--fromemail", "pisan@uw.edu", "--fromname", "Yusuf Pisan",
                           "--subject", "CSS 132: Comments from JollyFeedback on coffeeorder.c",
                           "--fileforintrotext", os.path.join(MYDIR, "emailintro.txt"),
-                        # BE CAREFULL -- DO NOT SPAM PEOPLE
-                        #  "--reallysend"
+                          # BE CAREFULL -- DO NOT SPAM PEOPLE
+                          #  "--reallysend"
                           ],
                       timeout=200)

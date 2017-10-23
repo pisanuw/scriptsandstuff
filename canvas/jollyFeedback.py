@@ -8,63 +8,24 @@ if not sys.version_info >= (3, 5):
     sys.exit(-1)
 
 # pylint: disable=wrong-import-position
-import csv
 import os
 import subprocess
 import time
 import argparse
 import re
+import jollyhelper
 
 TIMEOUT = 20
 
-class Student():
-    # pylint: disable=too-few-public-methods
-    def __init__(self, lastfirst='', number='', netid=''):
-        self.lastfirst = lastfirst
-        self.number = number
-        self.netid = netid
-    def __str__(self):
-        return "<S: " + " ".join([self.lastfirst, self.number, self.netid]) + ">"
-
-
-
-
-
-STUDENTINFO = []
-
-# The UW student list is in the form of
-# Student Number	UW NetID	Name	Last Name	Credits	Class	Majors	Email
-# def readStudentListmyUWCSV(classList):a
-#     with open(classList) as csvfile:
-#         classReader = csv.reader(csvfile, delimiter=',')
-#         for row in classReader:
-#             STUDENTINFO[row[0]] = Student(row[0],row[1],row[2],row[3],row[7])
-
-
-# Canvas download grades gives you a csv file of the form
-# Student, ID, SIS User ID, SIS Login ID, Section
-# Student is Lastname, Firstname Middlename
-def readStudentListCanvasCSV(classList):
-    with open(classList) as csvfile:
-        classReader = csv.reader(csvfile, delimiter=',')
-        # skip 2 header lines
-        next(classReader)
-        next(classReader)
-        for row in classReader:
-            STUDENTINFO.append(Student(row[0], row[1], row[3]))
-
-def printStudentList():
-    for student in STUDENTINFO:
-        print(student)
 
 # canvas files are
 # lastnamefirstname_studentnumber_someothernumber_actualsubmittedfile-version.extension
-def bfile2ok(filename):
+def canvasFileIsOK(filename):
     ln = len(filename.split('_'))
     # file can have 5 parts when late, 6 or more if _ part of file name
     return ln >= 4
 
-def bfile2lateToNormal(filename):
+def canvasFile2lateToNormal(filename):
     patlate = "^(.*)_late_(.*)$"
     prog = re.compile(patlate)
     result = prog.match(filename)
@@ -74,11 +35,19 @@ def bfile2lateToNormal(filename):
 
 # canvas files are
 # lastnamefirstname_studentnumber_someothernumber_actualsubmittedfile-version.extension
-def bfile2submitted(filename):
-    filename = bfile2lateToNormal(filename)
+def canvasFile2part(filename, partNum):
+    filename = canvasFile2lateToNormal(filename)
     parts = filename.split('_')
-    assert len(parts) >= 4
-    (_lastfirst, _num, _mysterynum, actualsubmitted) = parts[:4]
+    assert len(parts) >= 4 and partNum >= 0 and partNum <= 3
+    fileWithParts = parts[:4]
+    # 0 lastnamefirstname
+    # 1 studentnumber
+    # 2 someothernumber
+    # 3 actualsubmittedfile
+    return fileWithParts[partNum]
+    
+def canvasFile2submitted(filename):
+    actualsubmitted = canvasFile2part(filename, 3)
     patversion = "^(.*)-[0-9]+.(.*)$"
     prog = re.compile(patversion)
     result = prog.match(actualsubmitted)
@@ -86,55 +55,50 @@ def bfile2submitted(filename):
         actualsubmitted = result.group(1) + "." + result.group(2)
     return actualsubmitted
 
-def bfile2studentnumber(filename):
-    filename = bfile2lateToNormal(filename)
-    parts = filename.split('_')
-    assert len(parts) >= 4
-    (_lastfirst, num, _mysterynum, _actualsubmitted) = parts[:4]
-    return num
+def canvasFile2studentnumber(filename):
+    return canvasFile2part(filename, 1)
 
-def bfile2studentdir(filename):
-    filename = bfile2lateToNormal(filename)
-    parts = filename.split('_')
-    assert len(parts) >= 4
-    (lastfirst, _num, _mysterynum, _actualsubmitted) = parts[:4]
-    # lets use just lastfirst, no student number
-    # return lastfirst + "_" + num
-    return lastfirst
+def canvasFile2studentdir(filename):
+    return canvasFile2part(filename, 0)
 
-def getStudentNetID(number):
-    print("Looking for %s" % number)
-    for student in STUDENTINFO:
-        if number == student.number:
-            return student.netid
-    return 0
+def getNonDotFiles(directory):
+    files = os.listdir(directory)
+    files = [f for f in files if os.path.isfile(os.path.join(directory, f)) and f[0] != '.']
+    return files
 
+def getCanvasFiles(directory):
+    files = getNonDotFiles(directory)
+    files = [f for f in files if os.path.isfile(os.path.join(directory, f)) and canvasFileIsOK(f)]
+    return files
+    
 def moveFiles(submit):
-    files = os.listdir(submit)
-    print("Found", len(files), "files and directories")
-    files = [f for f in files if os.path.isfile(os.path.join(submit, f)) and f[0] != '.']
-    print("Found", len(files), "files: ", files)
+    files = getCanvasFiles(submit)
+    print("Found", len(files), "files")
     count = 1
     for file in files:
-        print(count, " processing", file)
-        if bfile2ok(file):
-            filefull = os.path.join(submit, file)
-            sdirfull = os.path.join(submit, bfile2studentdir(file))
-            newfilefull = os.path.join(sdirfull, bfile2submitted(file))
-            if not os.path.exists(sdirfull):
-                print("   Making ", sdirfull)
-                os.mkdir(sdirfull)
-            print("   Renaming ", filefull, " to ", newfilefull)
-            os.rename(filefull, newfilefull)
-            # Add student UWNetID if possible
-            snumber = bfile2studentnumber(file)
-            sID = getStudentNetID(snumber)
-            if sID:
-                sidFile = os.path.join(sdirfull, format("tester_netid_%s.txt" % sID))
-                with open(sidFile, "w") as outfile:
-                    outfile.write(sID)
-        else:
-            print("*** Skipping bad file: ", file)
+        # print(count, " processing", file)
+        canvasFileFull = os.path.join(submit, file)
+        studentDir = os.path.join(submit, canvasFile2studentdir(file)) 
+        studentFile = os.path.join(studentDir, canvasFile2submitted(file))
+        if not os.path.exists(studentDir):
+            os.mkdir(studentDir)
+        os.rename(canvasFileFull, studentFile)
+        print(count, " Moving %s to %s" %
+              (file, 
+               os.path.join(os.path.basename(submit), canvasFile2studentdir(file))))
+        # Add student UWNetID if possible
+        snumber = canvasFile2studentnumber(file)
+        sID = jollyhelper.getStudentNetID(snumber)
+        sName = jollyhelper.getStudentName(snumber)
+        if not sID is None:
+            sFile = os.path.join(studentDir, format("tester_netid_%s.txt" % sID))
+            with open(sFile, "w") as outfile:
+                outfile.write(sID)
+        if not sName is None:
+            sNameWithUnderScore = jollyhelper.substCommaAndSpace(sName)
+            sFile = os.path.join(studentDir, format("tester_name_%s.txt" % sNameWithUnderScore))
+            with open(sFile, "w") as outfile:
+                outfile.write(sName)
         count = count + 1
 
 def runtests(helpdir, testdir, submitdir):
@@ -187,14 +151,23 @@ def runtests(helpdir, testdir, submitdir):
 def main():
     parser = argparse.ArgumentParser()
     # pylint: disable=line-too-long
-    parser.add_argument("--dir", help="submission directory where downloaded canvas files are located, default . for current dir")
+    parser.add_argument("--dir", 
+                        default=".",
+                        help="submission directory where downloaded canvas files are located " +
+                        "(default: %(default)s)")
+    parser.add_argument("--zipfile",
+                        default=None,
+                        help="the zip file downloaded from canvas with all assignments, (default: %(default)s) " +
+                        "Cannot have both --dir and zipfile. If both provided, zipfile overrides --dir")
     parser.add_argument("--testdir", default=None, help="tester scripts directory, test scripts must be named test_xxx (no default, must be provided)")
     parser.add_argument("--classlist", help="csvfile for the classlist with student ids")
     parser.add_argument("--helpdir", default=None, help="helper scripts directory, defaults to the directory where this file is")
     args = parser.parse_args()
 
-    if not args.dir:
-        args.dir = "."
+    if not args.zipfile is None:
+        if not args.dir == '.':
+            print("*** Cannot use --dir %s and --zipfile %s, choose one or the other" % (args.dir, args.zipfile))
+            return
     args.dir = os.path.abspath(os.path.expanduser(args.dir))
     if not os.path.isdir(args.dir):
         print("*** submission_directory %s is not a valid directory" % args.dir)
@@ -204,15 +177,13 @@ def main():
         args.classlist = os.path.abspath(os.path.expanduser(args.classlist))
         if os.path.isfile(args.classlist):
             print("Reading csv file %s" % args.classlist)
-            readStudentListCanvasCSV(args.classlist)
+            jollyhelper.readStudentListCanvasCSV(args.classlist)
             # printStudentList()
         else:
             print("*** classlist %s is not a valid file" % args.classlist)
             sys.exit(-1)
 
-    if args.testdir is None:
-        print("Not testing anything, just moving files")
-    else:
+    if not args.testdir is None:
         args.testdir = os.path.abspath(os.path.expanduser(args.testdir))
         if not os.path.isdir(args.testdir):
             print("*** testdir should be a director for test scripts, %s is not a valid directory" % args.testdir)
@@ -224,8 +195,29 @@ def main():
     if not os.path.isdir(args.helpdir):
         print("*** helpdir should be a directory for helper scripts, %s is not a valid directory" % args.helpdir)
         sys.exit(-1)
-    print("Current time: %s"  % time.strftime("%Y-%m-%d %H:%M:%S"))
-    print("Changing directory to ", args.dir)
+    if not args.zipfile is None:
+        args.zipfile = os.path.abspath(os.path.expanduser(args.zipfile))
+        if os.path.isfile(args.zipfile):
+            targetDir = jollyhelper.unzipSubmissions(args.zipfile)
+            if targetDir is None:
+                print("*** Failed to unzip %s" % args.zipfile)
+                return
+            if not os.path.isdir(targetDir):
+                print("*** Unzipped %s, but could not find directory % for the files%s" % (args.zipfile, targetDir))
+                return
+            args.dir = targetDir
+        else:
+            print("*** zipfile %s could not be found" % args.zipfile)
+            return
+    canvasFiles = getCanvasFiles(args.dir)
+    if len(canvasFiles) == 0:
+        print("*** No canvas files of the form\n" +
+              "lastnamefirstname_studentnumber_someothernumber_actualsubmittedfile-version.extension\n" +
+              "was found in %s." % args.dir)
+        print("Try calling %s with --zipfile or --dir" % os.path.basename(__file__))
+        return
+    # print("Current time: %s"  % time.strftime("%Y-%m-%d %H:%M:%S"))
+    # print("Changing directory to ", args.dir)
     moveFiles(args.dir)
     if not args.testdir is None:
         runtests(args.helpdir, args.testdir, args.dir)
