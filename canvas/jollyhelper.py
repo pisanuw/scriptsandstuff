@@ -125,8 +125,9 @@ def unzipSubmissions(zipFile=None):
     return targetDir
 
 def printDraft(msg, out=DEFAULTDRAFTEMAIL):
-    with open(out, "a") as outfile:
-        print(msg, outfile)
+    if not msg is None:
+        with open(out, "a") as outfile:
+            outfile.write(msg)
    
 def startHelpSeparator(msg, out=sys.stdout):
     print("* Start: " + msg, file=out)
@@ -167,20 +168,31 @@ def compareFiles(file1, file2, label1=None, label2=None):
     helperMsg = format("comparing %s to %s" % (label1, label2))
     startHelpSeparator(helperMsg)
     stillOK = True
-    print("Comparison is to make it easier to pinpoint differences.")
-    print("These are not necessarily errors, just places to pay attention to.")
     if not os.path.isfile(file1):
+        printDraft(format("Could not find %s. Cannot compare outputs\n" % label1))
         print("ALERT: Could not find %s to compare" % file1)
         stillOK = False
     if not os.path.isfile(file2):
+        printDraft(format("Could not find %s. Cannot compare outputs\n" % label2))
         print("SCRIPT ERROR: Could not find template file %s to compare" % file2)
         stillOK = False
     if stillOK:
-        result = subprocess.run(["diff", "--label", label1, "--label", label2,
-                                 "--report-identical-files", "--unified=1",
-                                 "--suppress-common-lines", file1, file2])
+        ftmp = tempfile.NamedTemporaryFile(delete=False)
+        ftmp.close()
+        with open(ftmp.name, "w") as ftmpout:
+            result = subprocess.run(["diff", "--label", label1, "--label", label2,
+                                     "--report-identical-files", "--unified=1",
+                                     "--suppress-common-lines", file1, file2],
+                                    stderr=subprocess.STDOUT,
+                                    stdout=ftmpout)
         if result.returncode > 1:
             print("SCRIPT ERROR: diff returned %d" % result)
+        if os.path.isfile(ftmp.name):
+            with open(ftmp.name) as fp:
+                lines = fp.read()
+                print(lines)
+                printDraft(lines)
+            os.unlink(ftmp.name)
     endHelpSeparator(helperMsg)
 
 def compareToTemplate(studentfile, templateFile):
@@ -229,8 +241,10 @@ def genericCompile(compiler, cFlags, srcFile, exeFile):
         if os.path.isfile(exeFile):
             os.remove(exeFile)
         command = [compiler] + cFlags + [srcFile]
+        printDraft(format("\n\t%s\n\n" % " ".join(command)));
         result = subprocess.run(command)
         if result.returncode != 0 or not os.path.isfile(exeFile):
+            printDraft(format("Tried to compile %s, but did not get %s. File did not compile\n" % (srcFile, exeFile)));
             print("ALERT: Failed to compile %s using %s" %
                   (srcFile, " ".join(command)), flush=True)
         if result.returncode == 0 and os.path.isfile(exeFile):
@@ -335,6 +349,10 @@ def cCleanExeFiles():
     for file in files:
         os.unlink(file)
 
+def cleanDraftEmail():
+    if os.path.isfile(DEFAULTDRAFTEMAIL):
+        os.unlink(DEFAULTDRAFTEMAIL)
+
 def javaRunCompareOutput(templateFile, givenfile=None):
     if not os.path.isfile(templateFile):
         print("SCRIPT ERROR: Could not find template file: %s" % templateFile)
@@ -436,6 +454,7 @@ def cRunWithInput(inputfile, givenfile=None, outfilefp=None):
         files = givenfile
     else:
         files = [givenfile]
+    printDraft(format("Let's try compiling these files: %s\n" % ", ".join(files)));
     with open(inputfile) as fp:
         lines = fp.readlines()
     helperMsg = format("running %s and feeding it input to examine output" %
@@ -444,11 +463,14 @@ def cRunWithInput(inputfile, givenfile=None, outfilefp=None):
     for file in files:
         (_, cFile, cExe) = cFile2Components(file)
         if not os.path.isfile(cExe):
+            printDraft("Compiling %s\n" % cFile);
             cCompile(cFile)
         if os.path.isfile(cExe):
             helperMsg2 = format("running %s < %s" % (cExe, os.path.basename(inputfile)))
             print(helperMsg2)
             print("Input lines are:\n%s" % lines, flush=True)
+            printDraft(format("Compilation succeeded.\nLet's try some values as input to %s\n" % cExe))
+            printDraft(format("Input lines are:\n%s\n" % lines))
             if not outfilefp is None:
                 with open(outfilefp.name, "w") as outfile:
                     with subprocess.Popen(["./" + cExe],
@@ -477,6 +499,8 @@ def cRunWithInputOutput(inputfile, templateFile, givenfile):
     outfilefp.close()
     cRunWithInput(inputfile, givenfile, outfilefp)
     if os.path.isfile(outfilefp.name):
+        printDraft("The output from the program is saved in your-program-output.txt.\n");
+        printDraft("Let's compare the output to what we expected.\n");
         compareFiles(outfilefp.name, os.path.join(TESTERPATH, templateFile), "your-program-output.txt")
         os.unlink(outfilefp.name)
 
@@ -692,6 +716,9 @@ def mailSendFile(fromEmail=None,
         print("* Copy of this email is in %s\n===" % filetosaveemail)
         # print(msgbody)
         endHelpSeparator(helpermsg)
+
+# printDraft("testing 123")
+# exit(-1)
 
 if __name__ == "__main__":
     print(HELPERINFO)

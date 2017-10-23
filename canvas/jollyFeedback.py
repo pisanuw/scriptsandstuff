@@ -70,7 +70,12 @@ def getCanvasFiles(directory):
     files = getNonDotFiles(directory)
     files = [f for f in files if os.path.isfile(os.path.join(directory, f)) and canvasFileIsOK(f)]
     return files
-    
+
+def getAllSubdirectories(directory):
+    dirs = os.listdir(directory)
+    dirs = [f for f in dirs if os.path.isdir(os.path.join(directory, f))]
+    return dirs
+
 def moveFiles(submit):
     files = getCanvasFiles(submit)
     print("Found", len(files), "files")
@@ -210,7 +215,8 @@ def main():
             print("*** zipfile %s could not be found" % args.zipfile)
             return
     canvasFiles = getCanvasFiles(args.dir)
-    if len(canvasFiles) == 0:
+    subdirectories = getAllSubdirectories(args.dir)
+    if len(canvasFiles) == 0 and len(subdirectories) == 0:
         print("*** No canvas files of the form\n" +
               "lastnamefirstname_studentnumber_someothernumber_actualsubmittedfile-version.extension\n" +
               "was found in %s." % args.dir)
