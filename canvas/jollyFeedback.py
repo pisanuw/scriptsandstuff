@@ -76,8 +76,7 @@ def getAllSubdirectories(directory):
     dirs = [f for f in dirs if os.path.isdir(os.path.join(directory, f))]
     return dirs
 
-def moveFiles(submit):
-    files = getCanvasFiles(submit)
+def moveFiles(submit, files):
     print("Found", len(files), "files")
     count = 1
     for file in files:
@@ -224,8 +223,12 @@ def main():
         return
     # print("Current time: %s"  % time.strftime("%Y-%m-%d %H:%M:%S"))
     # print("Changing directory to ", args.dir)
-    moveFiles(args.dir)
-    if not args.testdir is None:
+    files = getCanvasFiles(args.dir)
+    if len(files) > 0:
+        moveFiles(args.dir, files)
+    if args.testdir is None:
+        print("*** Not doing any testing, use --testdir to specify tests")
+    else:
         runtests(args.helpdir, args.testdir, args.dir)
 
 # let's make this happen
