@@ -101,7 +101,30 @@ def getStudentNetID(number):
         if number == student.number:
             return student.netid
     return None
-
+############################################
+# File modifications
+############################################
+def insertFileAfterPattern(inFile, pattern, textFile, outFile):
+    with open(textFile) as file:
+        textLines = file.readlines()
+    textLines = "".join(textLines)
+    prog = re.compile(pattern, re.DOTALL | re.MULTILINE)
+    with open(inFile) as file:
+        fileLines = file.readlines()
+    fileLines = "".join(fileLines)
+    with open(outFile, "w") as out:
+        result = prog.match(fileLines)
+        if (result):
+            print("XXX Found match!!!")
+            # write stuff with extra
+            out.write(result.group(1))
+            out.write(result.group(2))
+            out.write(textLines)
+            out.write(result.group(3))
+        else:
+            print("XXX NOT Found match!!!")
+            print(fileLines)
+            out.write(fileLines)
 ############################################
 # Unzip files
 ############################################
@@ -276,19 +299,15 @@ def cCompile(givenfile=None):
         genericCompile(CCOMPILER, CFLAGS + [cExe], cFile, cExe)
 
 def genericRun(vmRunner, vmFlags, exeFile):
-    if not os.path.isfile(exeFile):
-        return -1
     helperMsg = format("running %s" % (exeFile))
     startHelpSeparator(helperMsg)
-    if not os.path.isfile(exeFile):
-        print("ALERT: Could not find %s to run" % exeFile)
-        return -1
     if vmRunner is None:
         command = [exeFile]
     else:
-        command = [[vmRunner] + vmFlags + [exeFile]]
+        command = [vmRunner] + vmFlags + [exeFile]
     result = None
     try:
+        print("XXX command is %s" % command)
         result = subprocess.run(command, timeout=TIMEOUT)
     except subprocess.TimeoutExpired as err:
         print("ALERT: Ran out of time when running %s " % command)
@@ -527,6 +546,7 @@ def runHelper(cmd, args=None, timeout=10):
     # print(runcmd)
     run = None
     try:
+        print("Executing %s" % runcmd)
         run = subprocess.run(runcmd, timeout=timeout)
     except subprocess.TimeoutExpired as err:
         print("ALERT: Ran out of time when running %s " % fullcmd)
