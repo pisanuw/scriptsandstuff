@@ -115,16 +115,27 @@ def insertFileAfterPattern(inFile, pattern, textFile, outFile):
     with open(outFile, "w") as out:
         result = prog.match(fileLines)
         if (result):
-            print("XXX Found match!!!")
+            # print("XXX Found match!!!")
             # write stuff with extra
             out.write(result.group(1))
             out.write(result.group(2))
             out.write(textLines)
             out.write(result.group(3))
         else:
-            print("XXX NOT Found match!!!")
+            # print("XXX NOT Found match!!!")
             print(fileLines)
             out.write(fileLines)
+
+def insertFileAtEnd(inFile, textFile, outFile):
+    with open(textFile) as file:
+        textLines = file.readlines()
+    textLines = "".join(textLines)
+    with open(inFile) as file:
+        fileLines = file.readlines()
+    fileLines = "".join(fileLines)
+    with open(outFile, "w") as out:
+        out.write(fileLines)
+        out.write(textLines)
 ############################################
 # Unzip files
 ############################################
@@ -307,7 +318,7 @@ def genericRun(vmRunner, vmFlags, exeFile):
         command = [vmRunner] + vmFlags + [exeFile]
     result = None
     try:
-        print("XXX command is %s" % command)
+        # print("XXX command is %s" % command)
         result = subprocess.run(command, timeout=TIMEOUT)
     except subprocess.TimeoutExpired as err:
         print("ALERT: Ran out of time when running %s " % command)
@@ -340,7 +351,10 @@ def cRun(givenfile=None):
         files = [givenfile]
     for file in files:
         (_, _, cExe) = cFile2Components(file)
-        genericRun(None, [], "./" + cExe)
+        if (os.path.isfile(cExe)):
+            genericRun(None, [], "./" + cExe)
+        else:
+            print("ALERT: Could not find %s to run" % cExe)
 
 def javaCompileRun(file=None):
     javaCompile(file)
