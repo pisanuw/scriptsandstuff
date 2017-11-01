@@ -463,16 +463,16 @@ def javaRunWithInput(inputfile, givenfile=None):
     print()
     endHelpSeparator(helperMsg)
 
-def cRunWithInput(inputfile, givenfile=None, outfilefp=None):
+def cRunWithInput(inputfile, filetorun=None, outfilefp=None):
     if not os.path.isfile(inputfile):
         print("SCRIPT ERROR: cRunWithInput could not find %s" % inputfile)
         return
-    if givenfile is None or (isinstance(givenfile, list) and givenfile == []):
+    if filetorun is None or (isinstance(filetorun, list) and filetorun == []):
         files = dirListC()
-    elif isinstance(givenfile, list):
-        files = givenfile
+    elif isinstance(filetorun, list):
+        files = filetorun
     else:
-        files = [givenfile]
+        files = [filetorun]
     printDraft(format("Let's try compiling these files: %s\n" % ", ".join(files)));
     with open(inputfile) as fp:
         lines = fp.readlines()
@@ -507,7 +507,7 @@ def cRunWithInput(inputfile, givenfile=None, outfilefp=None):
     print()
     endHelpSeparator(helperMsg)
 
-def cRunWithInputOutput(inputfile, templateFile, givenfile):
+def cRunWithInputOutput(inputfile, templateFile, filetorun):
     if not os.path.isfile(inputfile):
         print("SCRIPT ERROR: cRunWithInput could not find %s" % inputfile)
         return
@@ -516,7 +516,7 @@ def cRunWithInputOutput(inputfile, templateFile, givenfile):
         return
     outfilefp = tempfile.NamedTemporaryFile(delete=False)
     outfilefp.close()
-    cRunWithInput(inputfile, givenfile, outfilefp)
+    cRunWithInput(inputfile, filetorun, outfilefp)
     if os.path.isfile(outfilefp.name):
         printDraft("The output from the program is saved in your-program-output.txt.\n");
         printDraft("Let's compare the output to what we expected.\n");
