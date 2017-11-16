@@ -547,6 +547,7 @@ def runHelper(cmd, args=None, timeout=10):
         fullcmd = cmd
     else:
         fullcmd = os.path.join(TESTERPATH, cmd)
+    #print("runHelper XXXXX fullcmd: "  + fullcmd);
     if not os.path.isfile(fullcmd):
         print("*** Could not find %s to execute, skipping test" % fullcmd)
         return
