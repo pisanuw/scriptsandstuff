@@ -127,6 +127,12 @@ def insertFileAfterPattern(inFile, pattern, textFile, outFile):
             out.write(fileLines)
 
 def insertFileAtEnd(inFile, textFile, outFile):
+    if not os.path.isfile(inFile):
+        print("SCRIPT ERROR: zipfile %s is not found" % inFile)
+        return None
+    if not os.path.isfile(textFile):
+        print("SCRIPT ERROR: zipfile %s is not found" % textFile)
+        return None
     with open(textFile) as file:
         textLines = file.readlines()
     textLines = "".join(textLines)
