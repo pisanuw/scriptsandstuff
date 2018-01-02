@@ -328,6 +328,7 @@ def genericRun(vmRunner, vmFlags, exeFile):
 
     if result is None or result.returncode:
         print("ALERT: Got an error when running %s using %s" % (exeFile, command), flush=True)
+        return -1
     endHelpSeparator(helperMsg)
     return result.returncode
 
