@@ -12,12 +12,12 @@ import socket
 import subprocess
 import re
 import os
-import shutil
 import tempfile
 import time
 import smtplib
 import email.mime.text
 import zipfile
+import shutil
 
 TIMEOUT = 5
 MAILTIMEDELAY = 15
@@ -26,7 +26,7 @@ JAVACOMPILER = "javac"
 JAVAVM = "java"
 JAVAFLAGS = ["-ea"]
 CCOMPILER = "gcc"
-CFLAGS = ["-Wall", "-g", "-o"]
+CFLAGS = ["-Wall", "-Wextra", "-g", "-o"]
 DEFAULTDRAFTEMAIL = "tester_draftemail.txt"
 
 HELPERINFO = """
@@ -114,7 +114,7 @@ def insertFileAfterPattern(inFile, pattern, textFile, outFile):
     fileLines = "".join(fileLines)
     with open(outFile, "w") as out:
         result = prog.match(fileLines)
-        if (result):
+        if result:
             # print("XXX Found match!!!")
             # write stuff with extra
             out.write(result.group(1))
@@ -145,6 +145,29 @@ def insertFileAtEnd(inFile, textFile, outFile):
 ############################################
 # Unzip files
 ############################################
+
+def unzipSubmittedZip(zipFile, targetDir):
+    if zipFile is None or not os.path.isfile(zipFile):
+        print("SCRIPT ERROR: zipfile %s is not found" % zipFile)
+        return None
+    print("Unzipping %s to %s" % (zipFile, targetDir))
+    with zipfile.ZipFile(zipFile, "r") as zipRef:
+        zipRef.extractall(path=targetDir)
+    (zipDir, _) = os.path.splitext(os.path.basename(zipFile))
+    zipFilesDir = os.path.join(targetDir, zipDir)
+    if not os.path.isdir(zipFilesDir):
+        print("*** Unzipped %s, but could not find directory %s for the files"
+              % (zipFile, zipFilesDir))
+        os.mkdir(zipFilesDir)
+        print("*** Creating new directory %s to extract the zip file" % (zipFilesDir))
+        with zipfile.ZipFile(zipFile, "r") as zipRef:
+            zipRef.extractall(path=zipFilesDir)
+        if os.path.isdir(zipFilesDir):
+            return targetDir
+        return None
+    return targetDir
+
+
 def unzipSubmissions(zipFile=None):
     if zipFile is None or not os.path.isfile(zipFile):
         print("SCRIPT ERROR: zipfile %s is not found" % zipFile)
@@ -157,10 +180,11 @@ def unzipSubmissions(zipFile=None):
               (targetDir, zipFile))
         return None
     print("Unzipping %s to %s" % (zipFile, targetDir))
-    with zipfile.ZipFile(zipFile,"r") as zipRef:
+    with zipfile.ZipFile(zipFile, "r") as zipRef:
         zipRef.extractall(path=targetDir)
     if not os.path.isdir(targetDir):
-        print("*** Unzipped %s, but could not find directory % for the files%s" % (zipFile, targetDir))
+        print("*** Unzipped %s, but could not find directory %s for the files"
+              % (zipFile, targetDir))
         return None
     return targetDir
 
@@ -168,7 +192,7 @@ def printDraft(msg, out=DEFAULTDRAFTEMAIL):
     if not msg is None:
         with open(out, "a") as outfile:
             outfile.write(msg)
-   
+
 def startHelpSeparator(msg, out=sys.stdout):
     print("* Start: " + msg, file=out)
     print("==================================================", file=out, flush=True)
@@ -192,6 +216,12 @@ def dirList(pat):
     files = os.listdir('.')
     prog = re.compile(pat)
     files = [f for f in files if os.path.isfile(f) and prog.match(f)]
+    return files
+
+def dirListDirs(pat):
+    files = os.listdir('.')
+    prog = re.compile(pat)
+    files = [f for f in files if os.path.isdir(f) and prog.match(f)]
     return files
 
 def dirListJava():
@@ -281,10 +311,11 @@ def genericCompile(compiler, cFlags, srcFile, exeFile):
         if os.path.isfile(exeFile):
             os.remove(exeFile)
         command = [compiler] + cFlags + [srcFile]
-        printDraft(format("\n\t%s\n\n" % " ".join(command)));
+        printDraft(format("\n\t%s\n\n" % " ".join(command)))
         result = subprocess.run(command)
         if result.returncode != 0 or not os.path.isfile(exeFile):
-            printDraft(format("Tried to compile %s, but did not get %s. File did not compile\n" % (srcFile, exeFile)));
+            printDraft(format("Tried to compile %s, but did not get %s. File did not compile\n"
+                              % (srcFile, exeFile)))
             print("ALERT: Failed to compile %s using %s" %
                   (srcFile, " ".join(command)), flush=True)
         if result.returncode == 0 and os.path.isfile(exeFile):
@@ -335,6 +366,8 @@ def genericRun(vmRunner, vmFlags, exeFile):
     if result is None or result.returncode:
         print("ALERT: Got an error when running %s using %s" % (exeFile, command), flush=True)
     endHelpSeparator(helperMsg)
+    if result is None:
+        return None
     return result.returncode
 
 def javaRun(givenfile=None):
@@ -357,7 +390,7 @@ def cRun(givenfile=None):
         files = [givenfile]
     for file in files:
         (_, _, cExe) = cFile2Components(file)
-        if (os.path.isfile(cExe)):
+        if os.path.isfile(cExe):
             genericRun(None, [], "./" + cExe)
         else:
             print("ALERT: Could not find %s to run" % cExe)
@@ -387,6 +420,9 @@ def cCleanExeFiles():
     files = dirList(".*.exe$")
     for file in files:
         os.unlink(file)
+    dirs = dirListDirs(".*.exe.dSYM$")
+    for dirx in dirs:
+        shutil.rmtree(dirx)
 
 def cleanDraftEmail():
     if os.path.isfile(DEFAULTDRAFTEMAIL):
@@ -416,7 +452,8 @@ def javaRunCompareOutput(templateFile, givenfile=None):
                 if result != 0:
                     print("ALERT: Got an error when running %s using %s" %
                           (javaBase, command), flush=True)
-            compareFiles(ftmp.name, os.path.join(TESTERPATH, templateFile), "your-program-output.txt")
+            compareFiles(ftmp.name, os.path.join(TESTERPATH, templateFile),
+                         "your-program-output.txt")
             os.unlink(ftmp.name)
             os.unlink(javaClass)
         else:
@@ -493,7 +530,7 @@ def cRunWithInput(inputfile, filetorun=None, outfilefp=None):
         files = filetorun
     else:
         files = [filetorun]
-    printDraft(format("Let's try compiling these files: %s\n" % ", ".join(files)));
+    printDraft(format("Let's try compiling these files: %s\n" % ", ".join(files)))
     with open(inputfile) as fp:
         lines = fp.readlines()
     helperMsg = format("running %s and feeding it input to examine output" %
@@ -502,13 +539,14 @@ def cRunWithInput(inputfile, filetorun=None, outfilefp=None):
     for file in files:
         (_, cFile, cExe) = cFile2Components(file)
         if not os.path.isfile(cExe):
-            printDraft("Compiling %s\n" % cFile);
+            printDraft("Compiling %s\n" % cFile)
             cCompile(cFile)
         if os.path.isfile(cExe):
             helperMsg2 = format("running %s < %s" % (cExe, os.path.basename(inputfile)))
             print(helperMsg2)
             print("Input lines are:\n%s" % lines, flush=True)
-            printDraft(format("Compilation succeeded.\nLet's try some values as input to %s\n" % cExe))
+            printDraft(format("Compilation succeeded.\nLet's try some values as input to %s\n"
+                              % cExe))
             printDraft(format("Input lines are:\n%s\n" % lines))
             if not outfilefp is None:
                 with open(outfilefp.name, "w") as outfile:
@@ -538,9 +576,10 @@ def cRunWithInputOutput(inputfile, templateFile, filetorun):
     outfilefp.close()
     cRunWithInput(inputfile, filetorun, outfilefp)
     if os.path.isfile(outfilefp.name):
-        printDraft("The output from the program is saved in your-program-output.txt.\n");
-        printDraft("Let's compare the output to what we expected.\n");
-        compareFiles(outfilefp.name, os.path.join(TESTERPATH, templateFile), "your-program-output.txt")
+        printDraft("The output from the program is saved in your-program-output.txt.\n")
+        printDraft("Let's compare the output to what we expected.\n")
+        compareFiles(outfilefp.name, os.path.join(TESTERPATH, templateFile),
+                     "your-program-output.txt")
         os.unlink(outfilefp.name)
 
 ###########################################################################
@@ -586,7 +625,7 @@ def runHelper(cmd, args=None, timeout=10):
 ###########################################################################
 def getNameFromTesterFile():
     files = os.listdir('.')
-    pat = "^tester_name_(.+)_(.+).txt$"
+    pat = "^tester_name_([^_]+)_(.+).txt$"
     prog = re.compile(pat)
     for file in files:
         result = prog.match(file)
@@ -594,7 +633,8 @@ def getNameFromTesterFile():
             lastName = result.group(1)
             firstName = result.group(2)
             # firstName can be John_Mary, so must open it up
-            firstName.replace("_", " ")
+            firstName = firstName.replace("_", " ")
+            lastName = lastName.replace("_", " ")
             return (lastName, firstName)
     return (None, None)
 
@@ -677,7 +717,13 @@ def getFullFromName(fromname, fromEmail):
         return format("<%s>" % (fromEmail))
     return format("%s <%s>" % (fromname, fromEmail))
 
-# pylint: disable=too-many-arguments, too-many-locals
+def getFullToName(toEmail):
+    (lastname, firstname) = getNameFromTesterFile()
+    if lastname is None or firstname is None:
+        return format("<%s>" % (toEmail))
+    return format("\"%s %s\" <%s>" % (firstname, lastname, toEmail))
+
+# pylint: disable=too-many-arguments, too-many-locals, too-many-return-statements
 def mailSendFile(fromEmail=None,
                  toEmail=None,
                  subject='Comments from JollyFeedback Automated Script',
@@ -739,20 +785,20 @@ def mailSendFile(fromEmail=None,
         msgbody = fp.read()
     msg = email.mime.text.MIMEText(msgbody)
     msg['From'] = getFullFromName(fromname, fromEmail)
-    msg['To'] = toEmail
+    msg['To'] = getFullToName(toEmail)
     msg['Subject'] = subject
     msg = msg.as_string()
     recipients = [fromEmail, toEmail]
     # CHECK if you REALLY want to send it
     if reallysend:
-        helpermsg = format("Sending mail to %s" % toEmail)
+        helpermsg = format("Sending mail to %s" % getFullToName(toEmail))
         startHelpSeparator(helpermsg)
         print("* Copy of this email is in %s\n===" % filetosaveemail)
         mailSendViaSMTP(fromEmail, recipients, msg, authfile=authfile, smtpserver=smtpserver)
         time.sleep(timedelay)
         endHelpSeparator(helpermsg)
     else:
-        helpermsg = "--reallysend is FALSE so not actually sending mail"
+        helpermsg = format("--reallysend is FALSE so not actually sending mail to %s" % getFullToName(toEmail))
         startHelpSeparator(helpermsg)
         print("* Copy of this email is in %s\n===" % filetosaveemail)
         # print(msgbody)
