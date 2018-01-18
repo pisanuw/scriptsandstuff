@@ -26,6 +26,10 @@ JAVACOMPILER = "javac"
 JAVAVM = "java"
 JAVAFLAGS = ["-ea"]
 CCOMPILER = "gcc"
+CPPCOMPILER = "g++"
+VALGRIND = "/Users/pisan/homebrew/bin/valgrind"
+CPPCHECK = "/Users/pisan/homebrew/bin/cppcheck"
+CPPLINT = "/Users/pisan/local/bin/cpplint.py"
 CFLAGS = ["-Wall", "-Wextra", "-g", "-o"]
 DEFAULTDRAFTEMAIL = "tester_draftemail.txt"
 
@@ -158,7 +162,10 @@ def unzipSubmittedZip(zipFile, targetDir):
     if not os.path.isdir(zipFilesDir):
         print("*** Unzipped %s, but could not find directory %s for the files"
               % (zipFile, zipFilesDir))
-        os.mkdir(zipFilesDir)
+        if not os.path.isdir(zipFilesDir):
+            if os.path.isfile(zipFilesDir):
+                os.rename(zipFilesDir, zipFilesDir + "-tester-renamed")
+            os.mkdir(zipFilesDir)
         print("*** Creating new directory %s to extract the zip file" % (zipFilesDir))
         with zipfile.ZipFile(zipFile, "r") as zipRef:
             zipRef.extractall(path=zipFilesDir)
@@ -304,24 +311,25 @@ def javaFile2Components(file):
 def cFile2Components(file):
     return genericFileComponents(file, ".c", ".exe")
 
-def genericCompile(compiler, cFlags, srcFile, exeFile):
-    helperMsg = format("compiling %s" % srcFile)
+def cppFile2Components(file):
+    return genericFileComponents(file, ".cpp", ".exe")
+
+def genericCompile(compiler, cFlags, srcFiles, exeFile):
+    helperMsg = format("compiling %s" % srcFiles)
     startHelpSeparator(helperMsg)
-    if os.path.isfile(srcFile):
-        if os.path.isfile(exeFile):
-            os.remove(exeFile)
-        command = [compiler] + cFlags + [srcFile]
-        printDraft(format("\n\t%s\n\n" % " ".join(command)))
-        result = subprocess.run(command)
-        if result.returncode != 0 or not os.path.isfile(exeFile):
-            printDraft(format("Tried to compile %s, but did not get %s. File did not compile\n"
-                              % (srcFile, exeFile)))
-            print("ALERT: Failed to compile %s using %s" %
-                  (srcFile, " ".join(command)), flush=True)
-        if result.returncode == 0 and os.path.isfile(exeFile):
-            print("Compiled %s and got %s" %(srcFile, exeFile))
-    else:
-        print("ALERT: Could not find %s to compile" % srcFile)
+    # assume all srcfiles exist
+    if os.path.isfile(exeFile):
+        os.remove(exeFile)
+    command = [compiler] + cFlags + srcFiles
+    printDraft(format("\n\t%s\n\n" % " ".join(command)))
+    result = subprocess.run(command)
+    if result.returncode != 0 or not os.path.isfile(exeFile):
+        printDraft(format("Tried to compile %s, but did not get %s. File did not compile\n"
+                          % (srcFiles, exeFile)))
+        print("ALERT: Failed to compile %s using %s"
+              % (srcFiles, " ".join(command)), flush=True)
+    if result.returncode == 0 and os.path.isfile(exeFile):
+        print("Compiled %s and got %s" %(srcFiles, exeFile))
     endHelpSeparator(helperMsg)
 
 def javaCompile(givenfile=None):
@@ -333,7 +341,7 @@ def javaCompile(givenfile=None):
         files = [givenfile]
     for file in files:
         (_, javaFile, javaClass) = javaFile2Components(file)
-        genericCompile(JAVACOMPILER, [], javaFile, javaClass)
+        genericCompile(JAVACOMPILER, [], [javaFile], javaClass)
 
 def cCompile(givenfile=None):
     if givenfile is None or (isinstance(givenfile, list) and givenfile == []):
@@ -344,7 +352,71 @@ def cCompile(givenfile=None):
         files = [givenfile]
     for file in files:
         (_, cFile, cExe) = cFile2Components(file)
-        genericCompile(CCOMPILER, CFLAGS + [cExe], cFile, cExe)
+        genericCompile(CCOMPILER, CFLAGS + [cExe], [cFile], cExe)
+
+def cppCompile(givenfiles, cppExe):
+    if not isinstance(givenfiles, list) or givenfiles == []:
+        print("ALERT: Need a list of cpp files to compile: %s" % givenfiles)
+        return
+    genericCompile(CPPCOMPILER, CFLAGS + [cppExe], givenfiles, cppExe)
+
+def genericRunShort(vmRunner, vmFlags):
+    helperMsg = format("running %s" % (vmRunner))
+    startHelpSeparator(helperMsg)
+    command = [vmRunner] + vmFlags
+    result = genericRunC(command)
+    if result is None or result.returncode:
+        print("ALERT: Got an error when running %s using %s" % (vmRunner, command), flush=True)
+        return -1
+    endHelpSeparator(helperMsg)
+    if result is None:
+        return None
+    return result.returncode
+
+
+def readPrintNLines(fname, number):
+    cnt = 1
+    with open(fname) as fp:
+        line = fp.readline()
+        while line and cnt < number:
+            print(line.strip())
+            line = fp.readline()
+            cnt += 1
+    return cnt;
+    
+# Modified to write to a temporary file
+# and then only read 1000 lines from that file
+def genericRunC(command):
+    ftmp = tempfile.NamedTemporaryFile(delete=False)
+    maxLines = 1000
+    commandstr = " ".join(command)
+    result = None
+    try:
+        # print("XXX command is %s" % command)
+        with open(ftmp.name, "w") as ftmpout:
+            result = subprocess.run(command,
+                                    stderr=ftmpout,
+                                    stdout=ftmpout,
+                                    timeout=TIMEOUT)
+        # done with the file read 1000 lines and spit it out
+        if readPrintNLines(ftmp.name, maxLines) >= maxLines:
+            print("\nALERT: Output truncated from %s at %s lines" % (commandstr, maxLines))
+        if os.path.isfile(ftmp.name):
+            os.unlink(ftmp.name)
+    except subprocess.TimeoutExpired as err:
+        if readPrintNLines(ftmp.name, maxLines) >= maxLines:
+            print("\nALERT: Output truncated from %s at %s lines" % (commandstr, maxLines))
+        print("ALERT: Ran out of time when running %s " % commandstr)
+        print("ALERT: Possible cause waiting for keyboard input")
+        print("ALERT: Possible cause infinite loop")
+        print("TimeoutExpired error: {0}".format(err))
+        if os.path.isfile(ftmp.name):
+            os.unlink(ftmp.name)
+    if result is None or result.returncode:
+        print("ALERT: Got an error when running %s" % commandstr, flush=True)
+    if os.path.isfile(ftmp.name):
+        os.unlink(ftmp.name)
+    return result
 
 def genericRun(vmRunner, vmFlags, exeFile):
     helperMsg = format("running %s" % (exeFile))
@@ -353,16 +425,7 @@ def genericRun(vmRunner, vmFlags, exeFile):
         command = [exeFile]
     else:
         command = [vmRunner] + vmFlags + [exeFile]
-    result = None
-    try:
-        # print("XXX command is %s" % command)
-        result = subprocess.run(command, timeout=TIMEOUT)
-    except subprocess.TimeoutExpired as err:
-        print("ALERT: Ran out of time when running %s " % command)
-        print("ALERT: Possible cause waiting for keyboard input")
-        print("ALERT: Possible cause infinite loop")
-        print("TimeoutExpired error: {0}".format(err))
-
+    result = genericRunC(command)
     if result is None or result.returncode:
         print("ALERT: Got an error when running %s using %s" % (exeFile, command), flush=True)
         return -1
@@ -396,6 +459,48 @@ def cRun(givenfile=None):
         else:
             print("ALERT: Could not find %s to run" % cExe)
 
+# valgrind has a bug where it can get signal 11
+# and will continue to write that line for 100+MB file
+# need to dump contents of the file to a text,
+# read only certain number of lines and
+def valgrindRun(cExe):
+    helperMsg = format("valgrind on %s" % cExe)
+    startHelpSeparator(helperMsg)
+    genericRunShort(VALGRIND, [cExe])
+    helperMsg = format("finished valgrind on %s" % cExe)
+    endHelpSeparator(helperMsg)
+
+def cppcheckRun(cpps):
+    helperMsg = format("cppcheck http://cppcheck.sourceforge.net/ on %s" % cpps)
+    startHelpSeparator(helperMsg)
+    print("****************************************************")
+    print("*** Use the cppcheck messages as a guide,        ***")
+    print("*** not all cppcheck advice needs to be followed ***")
+    print("****************************************************")
+    genericRunShort(CPPCHECK, ["--enable=all", "--inconclusive",
+                               "--std=posix", "--suppress=missingIncludeSystem"]
+                               + cpps)
+    helperMsg = format("finished cppcheck on %s" % cpps)
+    endHelpSeparator(helperMsg)
+
+def cpplintRun(cpps):
+    helperMsg = format("cpplint https://github.com/google/styleguide/tree/gh-pages/cpplint on %s" % cpps)
+    startHelpSeparator(helperMsg)
+    print("****************************************************")
+    print("*** Use the cpplint messages as a guide,         ***")
+    print("*** not all cpplint advice needs to be followed  ***")
+    print("****************************************************")
+    filters = "--filter=-legal/copyright,-whitespace/tab,-build/namespaces,-build/include,-whitespace/newline,-whitespace/braces"
+    keepL = ["whitespace/operators", "whitespace/comments", "whitespace/line_length",
+             "whitespace/end_of_line", "whitespace/blank_line", "whitespace/semicolon", "whitespace/indent",
+             "whitespace/comma", "readability/braces", "whitespace/parens", "runtime/references",
+             "runtime/string", "whitespace/ending_newline"]
+    # keep = ",-" + ",-".join(keepL)
+    # filters = filters + keep
+    genericRunShort(CPPLINT, ["--verbose=0", filters] + cpps)
+    helperMsg = format("finished cpplint on %s" % cpps)
+    endHelpSeparator(helperMsg)
+
 def javaCompileRun(file=None):
     javaCompile(file)
     javaRun(file)
@@ -411,6 +516,14 @@ def cCompileRun(givenfile=None):
         (_, cFile, cExe) = cFile2Components(file)
         cCompile(cFile)
         cRun(cExe)
+
+def cppCompileRun(givenfiles):
+    if not isinstance(givenfiles, list) or givenfiles == []:
+        print("ALERT: Need a list of cpp files to compile and run: %s" % givenfiles)
+        return
+    (_, _, cppExe) = cppFile2Components(givenfiles[0])
+    cppCompile(givenfiles, cppExe)
+    cRun(cppExe)
 
 def javaCleanClassFiles():
     files = dirList(".*.class$")
@@ -651,14 +764,16 @@ def getNETIDFromTesterFile():
     # email = 'yusuf.pisan@gmail.com'
     return studentEmail
 
-def mailWriteIntroduction(fp, introFile=None):
-    msg = """
-
-Hi,
-
+def mailWriteIntroduction(fp, introFile=None, name=None):
+    msg1 = ""
+    if name is None:
+        msg1 = "Hi,"
+    else:
+        msg1 = "Hi " + name + ","
+    msg2 = """
 This is JollyFeedback, but you can call me Jolly. I am an automated script. I ran a bunch of tests on your submission and the result is below. I am not very clever, so I easily get confused when the file names are wrong or when the output does not match what I expected. Still, I work hard! I am getting better.
 
-Hopefully the feedback below will be helpful to you.
+Hopefully the feedback below will be helpful to you, but remember the automated feedback is still limited. You have to test your programs fully yourself.
 
 Your friendly automated script,
 
@@ -667,9 +782,10 @@ PS: If you need to get a hold of my owner, the email address is pisan@uw.edu.
 Blame him for all the faults and I will take credit for anything good
 
 """
+    msg = "\n" + msg1 + "\n" + msg2
     if (not introFile is None) and os.path.isfile(introFile):
         with open(introFile) as introfp:
-            msg = "".join(introfp.readlines())
+            msg = msg + "".join(introfp.readlines())
     fp.write(msg)
 
 def mailSMTPLogin(smtpConnection, authFile=None):
@@ -772,34 +888,45 @@ def mailSendFile(fromEmail=None,
             print("SCRIPT ERROR: The diffDir directory %s could not be found" % diffDir)
             return
     # Enough checks, lets do it
+    (_toLastname, toFirstname) = getNameFromTesterFile()
+    fullToName = getFullToName(toEmail)
+    fullFromName = getFullFromName(fromname, fromEmail)
     # Read filetosend
-    with open(filetosend) as testerlog:
-        testerLines = testerlog.read()
+    # Check if filke is too big in bytes 1MB = 1000000 bytes
+    # max 0.5MB = 500000
+    if os.path.getsize(filetosend) < 500000:
+        with open(filetosend) as testerlog:
+            testerLines = testerlog.read()
+    else:
+        # read only 1000 lines
+        with open(filetosend) as testerlog:
+            head = [next(testerlog) for x in xrange(1000)]
+        testerLines = head + "\n\n The log file is too large. It has been truncated! \n"
     # Prepare saved version of email
     with open(filetosaveemail, "w") as fp:
-        mailWriteIntroduction(fp, fileforintrotext)
+        mailWriteIntroduction(fp, fileforintrotext, toFirstname)
         startHelpSeparator(format("Sent from %s to %s on %s\n" %
-                                  (fromEmail, toEmail, time.strftime("%Y-%m-%d %H:%M:%S"))), fp)
+                                  (fullFromName, fullToName, time.strftime("%Y-%m-%d %H:%M:%S"))), fp)
         fp.write(testerLines)
     # Email files saved, open and read it
     with open(filetosaveemail) as fp:
         msgbody = fp.read()
     msg = email.mime.text.MIMEText(msgbody)
-    msg['From'] = getFullFromName(fromname, fromEmail)
-    msg['To'] = getFullToName(toEmail)
+    msg['From'] = fullFromName
+    msg['To'] = fullToName
     msg['Subject'] = subject
     msg = msg.as_string()
     recipients = [fromEmail, toEmail]
     # CHECK if you REALLY want to send it
     if reallysend:
-        helpermsg = format("Sending mail to %s" % getFullToName(toEmail))
+        helpermsg = format("Sending mail to %s" % fullToName)
         startHelpSeparator(helpermsg)
         print("* Copy of this email is in %s\n===" % filetosaveemail)
         mailSendViaSMTP(fromEmail, recipients, msg, authfile=authfile, smtpserver=smtpserver)
         time.sleep(timedelay)
         endHelpSeparator(helpermsg)
     else:
-        helpermsg = format("--reallysend is FALSE so not actually sending mail to %s" % getFullToName(toEmail))
+        helpermsg = format("--reallysend is FALSE so not actually sending mail to %s" % fullToName)
         startHelpSeparator(helpermsg)
         print("* Copy of this email is in %s\n===" % filetosaveemail)
         # print(msgbody)

@@ -110,16 +110,24 @@ def moveFiles(submit, files):
                 outfile.write(sName)
         count = count + 1
 
-def runtests(helpdir, testdir, submitdir):
+def runtests(helpdir, testdir, submitdir, onlystudent=None):
     testerlog = "tester_logfile.txt"
     print("Test directory is %s" % testdir)
     testfiles = os.listdir(testdir)
     testfiles = [f for f in testfiles
                  if os.path.isfile(os.path.join(testdir, f)) and f.startswith("test_")]
     print("Found", len(testfiles), "files: ", testfiles)
-    sdirs = os.listdir(submitdir)
-    sdirs = [f for f in sdirs if os.path.isdir(os.path.join(submitdir, f))]
-    print("Found", len(sdirs), " student directories: ", sdirs)
+    sdirs = []
+    if onlystudent is None:
+        sdirs = os.listdir(submitdir)
+        sdirs = [f for f in sdirs if os.path.isdir(os.path.join(submitdir, f))]
+        print("Found", len(sdirs), " student directories: ", sdirs)
+    else:
+        dfull = os.path.join(submitdir, onlystudent)
+        if not os.path.isdir(dfull):
+            print("ALERT: Cannot find student directory %s " % dfull)
+            return;
+        sdirs = [onlystudent]
     for directory in sdirs:
         dfull = os.path.join(submitdir, directory)
         os.chdir(dfull)
@@ -171,6 +179,7 @@ def main():
                         "Cannot have both --dir and zipfile. If both provided, zipfile overrides --dir")
     parser.add_argument("--testdir", default=None, help="tester scripts directory, test scripts must be named test_xxx (no default, must be provided)")
     parser.add_argument("--classlist", help="csvfile for the classlist with student ids")
+    parser.add_argument("--studentonly", help="only run the test for this student")    
     parser.add_argument("--helpdir", default=None, help="helper scripts directory, defaults to the directory where this file is")
     args = parser.parse_args()
 
@@ -235,7 +244,7 @@ def main():
     if args.testdir is None:
         print("*** Not doing any testing, use --testdir to specify tests")
     else:
-        runtests(args.helpdir, args.testdir, args.dir)
+        runtests(args.helpdir, args.testdir, args.dir, args.studentonly)
 
 # let's make this happen
 main()
