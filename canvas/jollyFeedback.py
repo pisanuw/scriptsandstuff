@@ -143,10 +143,13 @@ def runtests(helpdir, testdir, submitdir, onlystudent=None):
         with open(logfile, "a") as outfile:
             outfile.write(testStartTime)
         for tesfile in testfiles:
+            testfilefull = os.path.join(testdir, tesfile)
+            if not os.access(testfilefull, os.X_OK):
+                 print("ALERT: testfile is not executable %s " % testfilefull)
+                 continue
             # each test opens the file to append
             with open(logfile, "a") as outfile:
                 print("---> Calling %s" % tesfile, end='.')
-                testfilefull = os.path.join(testdir, tesfile)
                 outfile.flush()
                 result = None
                 try:
