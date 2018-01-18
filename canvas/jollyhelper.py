@@ -27,9 +27,9 @@ JAVAVM = "java"
 JAVAFLAGS = ["-ea"]
 CCOMPILER = "gcc"
 CPPCOMPILER = "g++"
-VALGRIND = "/Users/pisan/homebrew/bin/valgrind"
-CPPCHECK = "/Users/pisan/homebrew/bin/cppcheck"
-CPPLINT = "/Users/pisan/local/bin/cpplint.py"
+VALGRIND = "valgrind"
+CPPCHECK = "cppcheck"
+CPPLINT = "cpplint.py"
 CPPFLAGS = ["-std=c++11", "-Wall", "-Wextra", "-g", "-o"]
 CFLAGS = ["-Wall", "-Wextra", "-g", "-o"]
 DEFAULTDRAFTEMAIL = "tester_draftemail.txt"
