@@ -30,6 +30,7 @@ CPPCOMPILER = "g++"
 VALGRIND = "/Users/pisan/homebrew/bin/valgrind"
 CPPCHECK = "/Users/pisan/homebrew/bin/cppcheck"
 CPPLINT = "/Users/pisan/local/bin/cpplint.py"
+CPPFLAGS = ["-std=c++11", "-Wall", "-Wextra", "-g", "-o"]
 CFLAGS = ["-Wall", "-Wextra", "-g", "-o"]
 DEFAULTDRAFTEMAIL = "tester_draftemail.txt"
 
@@ -358,7 +359,7 @@ def cppCompile(givenfiles, cppExe):
     if not isinstance(givenfiles, list) or givenfiles == []:
         print("ALERT: Need a list of cpp files to compile: %s" % givenfiles)
         return
-    genericCompile(CPPCOMPILER, CFLAGS + [cppExe], givenfiles, cppExe)
+    genericCompile(CPPCOMPILER, CPPFLAGS + [cppExe], givenfiles, cppExe)
 
 def genericRunShort(vmRunner, vmFlags):
     helperMsg = format("running %s" % (vmRunner))
