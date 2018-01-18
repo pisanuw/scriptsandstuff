@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/env python3
 """jollyFeedback is the driver for moving files downloaded from canvas into their own directories
 and then running all the test programs"""
 
